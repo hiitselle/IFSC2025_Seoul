@@ -275,9 +275,19 @@ def clean_text(text):
         return str(text) if text is not None else ""
     
     try:
-        # Remove common encoding artifacts
-        cleaned = text.replace('ÃƒÆ'Ã‚Â¢', '').replace('ÃƒÆ'Ã‚Â¡', '').replace('ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢', "'")
-        cleaned = cleaned.replace('ÃƒÂ¢Ã¢â€šÂ¬Ã…"', '"').replace('ÃƒÂ¢Ã¢â€šÂ¬', '"').replace('ÃƒÂ¢Ã¢â€šÂ¬"', '-')
+        # Remove common encoding artifacts - using proper Unicode escape sequences
+        cleaned = text.replace('\u00c3\u0083\u00c6\u0091\u00c3\u0086\u0092\u00c3\u0083\u00e2\u0080\u009a\u00c3\u0082\u00c2\u00a2', '')
+        cleaned = cleaned.replace('\u00c3\u0083\u00c6\u0091\u00c3\u0086\u0092\u00c3\u0083\u00e2\u0080\u009a\u00c3\u0082\u00c2\u00a1', '')
+        cleaned = cleaned.replace('\u00c3\u0083\u00c2\u00a2\u00c3\u0083\u00c2\u00a2\u00c3\u00a2\u00e2\u0082\u00ac\u00c5\u00a1\u00c3\u0082\u00c2\u00ac\u00c3\u0083\u00c2\u00a2\u00c3\u00a2\u00e2\u0082\u00ac\u00c5\u00be\u00c3\u0082\u00c2\u00a2', "'")
+        cleaned = cleaned.replace('\u00c3\u0083\u00c6\u0091\u00c3\u0082\u00c2\u00a2\u00c3\u0083\u00c2\u00a2\u00c3\u00a2\u00e2\u0082\u00ac\u00c5\u00a1\u00c3\u0082\u00c2\u00ac\u00c3\u0083\u00e2\u0080\u00a6\u00e2\u0080\u009d', '"')
+        cleaned = cleaned.replace('\u00c3\u0083\u00c6\u0091\u00c3\u0082\u00c2\u00a2\u00c3\u0083\u00c2\u00a2\u00c3\u00a2\u00e2\u0082\u00ac\u00c5\u00a1\u00c3\u0082\u00c2\u00ac', '"')
+        cleaned = cleaned.replace('\u00c3\u0083\u00c6\u0091\u00c3\u0082\u00c2\u00a2\u00c3\u0083\u00c2\u00a2\u00c3\u00a2\u00e2\u0082\u00ac\u00c5\u00a1\u00c3\u0082\u00c2\u00ac\u00e2\u0080\u009d', '-')
+        
+        # Alternative approach: use a more general cleanup
+        # Remove non-printable characters except common whitespace
+        import unicodedata
+        cleaned = ''.join(char for char in cleaned if unicodedata.category(char)[0] != 'C' or char in '\t\n\r ')
+        
         return cleaned.strip()
     except Exception as e:
         logger.warning(f"Error cleaning text '{text}': {e}")
@@ -299,7 +309,7 @@ def validate_dataframe(df, expected_columns):
 def get_competition_status(df, competition_name):
     """Determine competition status based on data"""
     if df.empty:
-        return "upcoming", "🔄"
+        return "upcoming", "📄"
     
     # Check if there are any scores/results
     if "Boulder" in competition_name:
@@ -325,7 +335,7 @@ def get_competition_status(df, competition_name):
                 else:
                     return "live", "🔴"
     
-    return "upcoming", "🔄"
+    return "upcoming", "📄"
 
 @st.cache_data(ttl=CONFIG['CACHE_TTL'])
 def load_sheet_data(url, retries=0):
@@ -402,7 +412,7 @@ def get_status_emoji(status_text):
     elif "no podium" in status_str:
         return "❌"
     else:
-        return "🔄"
+        return "📄"
 
 def display_enhanced_metrics(df, competition_name):
     """Display enhanced metrics with better calculation"""
@@ -1000,7 +1010,7 @@ def main():
     with col3:
         st.markdown(f'<div class="metric-card"><h4>✅ Completed</h4><h2>{completed_competitions}</h2></div>', unsafe_allow_html=True)
     with col4:
-        st.markdown(f'<div class="metric-card"><h4>🔄 Upcoming</h4><h2>{upcoming_competitions}</h2></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><h4>📄 Upcoming</h4><h2>{upcoming_competitions}</h2></div>', unsafe_allow_html=True)
     
     # Detailed results with enhanced presentation
     st.markdown("### 📊 Live Competition Results")
