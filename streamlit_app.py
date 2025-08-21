@@ -275,18 +275,30 @@ def clean_text(text):
         return str(text) if text is not None else ""
     
     try:
-        # Remove common encoding artifacts - using proper Unicode escape sequences
-        cleaned = text.replace('\u00c3\u0083\u00c6\u0091\u00c3\u0086\u0092\u00c3\u0083\u00e2\u0080\u009a\u00c3\u0082\u00c2\u00a2', '')
-        cleaned = cleaned.replace('\u00c3\u0083\u00c6\u0091\u00c3\u0086\u0092\u00c3\u0083\u00e2\u0080\u009a\u00c3\u0082\u00c2\u00a1', '')
-        cleaned = cleaned.replace('\u00c3\u0083\u00c2\u00a2\u00c3\u0083\u00c2\u00a2\u00c3\u00a2\u00e2\u0082\u00ac\u00c5\u00a1\u00c3\u0082\u00c2\u00ac\u00c3\u0083\u00c2\u00a2\u00c3\u00a2\u00e2\u0082\u00ac\u00c5\u00be\u00c3\u0082\u00c2\u00a2', "'")
-        cleaned = cleaned.replace('\u00c3\u0083\u00c6\u0091\u00c3\u0082\u00c2\u00a2\u00c3\u0083\u00c2\u00a2\u00c3\u00a2\u00e2\u0082\u00ac\u00c5\u00a1\u00c3\u0082\u00c2\u00ac\u00c3\u0083\u00e2\u0080\u00a6\u00e2\u0080\u009d', '"')
-        cleaned = cleaned.replace('\u00c3\u0083\u00c6\u0091\u00c3\u0082\u00c2\u00a2\u00c3\u0083\u00c2\u00a2\u00c3\u00a2\u00e2\u0082\u00ac\u00c5\u00a1\u00c3\u0082\u00c2\u00ac', '"')
-        cleaned = cleaned.replace('\u00c3\u0083\u00c6\u0091\u00c3\u0082\u00c2\u00a2\u00c3\u0083\u00c2\u00a2\u00c3\u00a2\u00e2\u0082\u00ac\u00c5\u00a1\u00c3\u0082\u00c2\u00ac\u00e2\u0080\u009d', '-')
+        # Start with the original text
+        cleaned = text
         
-        # Alternative approach: use a more general cleanup
-        # Remove non-printable characters except common whitespace
-        import unicodedata
-        cleaned = ''.join(char for char in cleaned if unicodedata.category(char)[0] != 'C' or char in '\t\n\r ')
+        # Remove specific garbled sequences commonly seen
+        garbled_patterns = [
+            'ÃÃ', 'Ã¡', 'Ã¢', 'Ã¤', 'Ã©', 'Ãª', 'Ãë', 'Ãí', 'Ãî', 'Ãï',
+            'Ãó', 'Ãô', 'Ãö', 'Ãº', 'Ãû', 'Ãü', 'Ãÿ', 'Ã ', 'Ã¿',
+            'âÂ', 'â€Â', 'â€™', 'â€œ', 'â€Â', 'â€Å"', 'â€šÂ', 'â€žÂ',
+            'Âª', 'Â°', 'Â±', 'Â²', 'Â³', 'Â¼', 'Â½', 'Â¾', 'Â¿', 'Ã', 'Â'
+        ]
+        
+        for pattern in garbled_patterns:
+            cleaned = cleaned.replace(pattern, '')
+        
+        # Clean up extra spaces that might result from removals
+        cleaned = ' '.join(cleaned.split())
+        
+        # Remove any remaining non-ASCII characters that look like encoding artifacts
+        import re
+        # Keep only ASCII letters, numbers, spaces, and common punctuation
+        cleaned = re.sub(r'[^\x00-\x7F]+', '', cleaned)
+        
+        # Clean up any double spaces
+        cleaned = re.sub(r'\s+', ' ', cleaned)
         
         return cleaned.strip()
     except Exception as e:
