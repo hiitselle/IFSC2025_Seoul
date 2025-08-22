@@ -1161,7 +1161,7 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
             (~df['Name'].astype(str).str.isdigit()) &
             (~df['Name'].astype(str).str.contains('Hold for|Min to|Qualification|Threshold|Zone|Top|TBD|TBA', na=False, case=False)) &
             (~df['Name'].astype(str).str.startswith(('Hold', 'Min', '#', 'Athlete '), na=False)) &
-            (~df['Name'].astype(str).str.match(r'^\d+\.?\d*
+            (~df['Name'].astype(str).str.match(r'^\d+\.?\d*$', na=False)) &
     , na=False)) &  # Remove pure numbers and decimals
             (~df['Name'].astype(str).str.match(r'^\d+\+', na=False)) &      # Remove "25+" style entries
             (~df['Name'].apply(is_placeholder_athlete))
