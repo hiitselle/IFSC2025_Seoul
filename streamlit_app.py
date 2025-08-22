@@ -625,24 +625,37 @@ def display_boulder_results(df, competition_name):
             if completed_boulders == 4 or (total_score not in ['N/A', '', None] and not pd.isna(total_score)):
                 if "Final" in competition_name:
                     # For Finals, use podium-based coloring (top 3)
-                    if rank_num > 0 and rank_num <= 3:
-                        if worst_finish_num and worst_finish_num <= 3:
-                            card_class = "podium-position"  # Green - safe podium
-                            position_emoji = "🥇" if rank_num == 1 else "🥈" if rank_num == 2 else "🥉"
-                        else:
-                            card_class = "podium-contention"  # Yellow - could drop off podium
-                            position_emoji = "⚠️"
+                    if worst_finish_num and worst_finish_num <= 3:
+                        # Guaranteed podium regardless of current position
+                        card_class = "podium-position"  # Green - guaranteed podium
+                        position_emoji = "🥇" if rank_num == 1 else "🥈" if rank_num == 2 else "🥉" if rank_num == 3 else "🏆"
+                    elif rank_num > 0 and rank_num <= 3:
+                        # Currently in top 3 - secure podium position
+                        card_class = "podium-position"  # Green - in podium position
+                        position_emoji = "🥇" if rank_num == 1 else "🥈" if rank_num == 2 else "🥉"
                     elif rank_num > 3:
-                        if worst_finish_num and worst_finish_num > 3:
-                            card_class = "no-podium"  # Red - out of podium positions
-                            position_emoji = "❌"
-                        else:
-                            card_class = "podium-contention"  # Yellow - still could make podium
+                        if completed_boulders < 4:
+                            card_class = "podium-contention"  # Yellow - still climbing, could move up
                             position_emoji = "⚠️"
+                        else:
+                            card_class = "no-podium"  # Red - finished outside podium
+                            position_emoji = "❌"# Red - finished outside podium
+                            position_emoji = "❌"
                         
                 elif "Semis" in competition_name:
                     # For Semis, use qualification-based coloring (top 8)
-                    if worst_finish_num:
+                    
+                    # Check if Top 8 is impossible from strategy display
+                    top8_impossible = False
+                    if 'Points Needed for Top 8' in df.columns:
+                        top8_value = row.get('Points Needed for Top 8', '')
+                        if 'IMPOSSIBLE' in str(top8_value).upper():
+                            top8_impossible = True
+                    
+                    if top8_impossible:
+                        card_class = "eliminated"  # Red - Top 8 is impossible
+                        position_emoji = "❌"
+                    elif worst_finish_num:
                         if worst_finish_num <= 8:
                             card_class = "qualified"  # Green - safe qualification to finals
                             position_emoji = "✅"
