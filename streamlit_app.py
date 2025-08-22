@@ -1176,7 +1176,7 @@ def is_placeholder_athlete(name: str) -> bool:
     
     # Check for other placeholder patterns
     placeholder_patterns = [
-        r'^athlete\s+\d+
+        r'^n/a$|^na$',                # Not available
 
 
 def display_qualification_thresholds(qualification_info: Dict[str, str]):
