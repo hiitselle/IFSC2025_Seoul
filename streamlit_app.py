@@ -625,21 +625,26 @@ def display_boulder_results(df, competition_name):
             if completed_boulders == 4 or (total_score not in ['N/A', '', None] and not pd.isna(total_score)):
                 if "Final" in competition_name:
                     # For Finals, use podium-based coloring (top 3)
+                    # Only green if worst finish is 3 or less
                     if worst_finish_num and worst_finish_num <= 3:
-                        # Guaranteed podium regardless of current position
+                        # Guaranteed podium
                         card_class = "podium-position"  # Green - guaranteed podium
                         position_emoji = "🥇" if rank_num == 1 else "🥈" if rank_num == 2 else "🥉" if rank_num == 3 else "🏆"
-                    elif rank_num > 0 and rank_num <= 3:
-                        # Currently in top 3 - secure podium position
-                        card_class = "podium-position"  # Green - in podium position
-                        position_emoji = "🥇" if rank_num == 1 else "🥈" if rank_num == 2 else "🥉"
+                    elif rank_num > 0 and rank_num <= 3 and completed_boulders < 4:
+                        # Currently in top 3 but haven't finished - could drop
+                        card_class = "podium-contention"  # Yellow - in podium position but could drop
+                        position_emoji = "⚠️"
                     elif rank_num > 3:
                         if completed_boulders < 4:
                             card_class = "podium-contention"  # Yellow - still climbing, could move up
                             position_emoji = "⚠️"
                         else:
                             card_class = "no-podium"  # Red - finished outside podium
-                            position_emoji = "❌"# Red - finished outside podium
+                            position_emoji = "❌"
+                    else:
+                        # Fallback for other cases (finished in top 3 but worst finish > 3)
+                        card_class = "podium-contention"  # Yellow - uncertain podium
+                        position_emoji = "⚠️"# Red - finished outside podium
                             position_emoji = "❌"
                         
                 elif "Semis" in competition_name:
