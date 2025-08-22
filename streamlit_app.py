@@ -645,7 +645,7 @@ def display_boulder_results(df, competition_name):
                         # Fallback for other cases (finished in top 3 but worst finish > 3)
                         card_class = "podium-contention"  # Yellow - uncertain podium
                         position_emoji = "⚠️"# Red - finished outside podium
-                            position_emoji = "❌"
+                        position_emoji = "❌"
                         
                 elif "Semis" in competition_name:
                     # For Semis, use qualification-based coloring (top 8)
