@@ -252,29 +252,13 @@ SHEETS_URLS = {
     "Female Lead Final": "https://docs.google.com/spreadsheets/d/1MwVp1mBUoFrzRSIIu4UdMcFlXpxHAi_R7ztp1E4Vgx0/export?format=csv&gid=528108640"
 }
 
-# Environment-based configuration
+# Configuration
 CONFIG = {
-    'CACHE_TTL': int(os.getenv('CACHE_TTL', 30)),
-    'AUTO_REFRESH_INTERVAL': int(os.getenv('AUTO_REFRESH_INTERVAL', 60)),
-    'MAX_RETRIES': int(os.getenv('MAX_RETRIES', 3)),
-    'REQUEST_TIMEOUT': int(os.getenv('REQUEST_TIMEOUT', 15)),
-    'DEBUG_MODE': os.getenv('DEBUG_MODE', 'False').lower() == 'true'
+    'CACHE_TTL': 30,
+    'AUTO_REFRESH_INTERVAL': 60,
+    'MAX_RETRIES': 3,
+    'REQUEST_TIMEOUT': 15,
 }
-
-def get_session():
-    """Create a requests session with connection pooling for better performance"""
-    session = requests.Session()
-    adapter = requests.adapters.HTTPAdapter(
-        pool_connections=10,
-        pool_maxsize=20,
-        max_retries=CONFIG['MAX_RETRIES']
-    )
-    session.mount('http://', adapter)
-    session.mount('https://', adapter)
-    return session
-
-# Create a global session for reuse
-session = get_session()
 
 def safe_numeric_conversion(value, default=0):
     """Safely convert value to numeric with proper error handling"""
@@ -287,14 +271,13 @@ def safe_numeric_conversion(value, default=0):
         return default
 
 def clean_text(text):
-    """Simplified and more robust text cleaning"""
+    """Clean text by removing unwanted characters and normalizing"""
     if not isinstance(text, str):
         return str(text) if text is not None else ""
     
     try:
-        # Remove encoding artifacts using ASCII conversion
+        # Simple ASCII conversion approach
         cleaned = text.encode('ascii', 'ignore').decode('ascii')
-        # Clean up whitespace
         cleaned = ' '.join(cleaned.split())
         return cleaned.strip()
     except Exception as e:
@@ -345,7 +328,7 @@ def get_competition_status(df, competition_name):
     
     return "upcoming", "📄"
 
-@st.cache_data(ttl=CONFIG['CACHE_TTL'], max_entries=10)
+@st.cache_data(ttl=CONFIG['CACHE_TTL'])
 def load_sheet_data(url, retries=0):
     """Load data from Google Sheets CSV export URL with enhanced error handling"""
     try:
@@ -353,7 +336,7 @@ def load_sheet_data(url, retries=0):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
-        response = session.get(
+        response = requests.get(
             url, 
             timeout=CONFIG['REQUEST_TIMEOUT'],
             headers=headers
@@ -421,6 +404,14 @@ def get_status_emoji(status_text):
         return "❌"
     else:
         return "📄"
+
+def is_placeholder_athlete(name):
+    """Check if name is a placeholder like 'Athlete 1', 'Athlete 23', etc."""
+    name_str = str(name).strip()
+    if name_str.startswith('Athlete '):
+        remaining = name_str[8:].strip()
+        return remaining.isdigit()
+    return False
 
 def display_enhanced_metrics(df, competition_name):
     """Display enhanced metrics with better calculation"""
@@ -622,9 +613,13 @@ def display_boulder_results(df, competition_name):
             # Get worst possible finish number
             worst_finish_num = None
             if worst_finish_display:
-                worst_finish_match = re.search(r'Worst Finish: (\d+)', worst_finish_display)
-                if worst_finish_match:
-                    worst_finish_num = int(worst_finish_match.group(1))
+                # Use simple string operations instead of regex
+                worst_parts = worst_finish_display.split("Worst Finish: ")
+                if len(worst_parts) > 1:
+                    try:
+                        worst_finish_num = int(worst_parts[1])
+                    except:
+                        pass
             
             # Only apply coloring if athlete has completed all 4 boulders OR has a valid score
             if completed_boulders == 4 or (total_score not in ['N/A', '', None] and not pd.isna(total_score)):
@@ -672,6 +667,7 @@ def display_boulder_results(df, competition_name):
                         
         except Exception as e:
             logger.warning(f"Error determining card class: {e}")
+            rank_num = safe_numeric_conversion(rank)
             if rank_num > 0:
                 position_emoji = f"#{rank_num}"
         
@@ -721,26 +717,6 @@ def display_boulder_results(df, competition_name):
         </div>
         """, unsafe_allow_html=True)
 
-def is_real_athlete(row):
-    """Fixed function to determine if a row represents a real athlete"""
-    name = str(row.get('Name', '')).strip()
-    rank = row.get('Current Rank', '')
-    score = row.get('Manual Score', '')
-    
-    # If name is empty or placeholder-like, it's not real
-    if not name or name.lower() in ['athlete', 'tbd', 'tba']:
-        return False
-    
-    # Fixed: Complete the regex pattern to match "Athlete XX" format
-    if re.match(r'^Athlete \d+, name):
-        return False
-    
-    # If no rank AND no score, likely not a real athlete
-    if (pd.isna(rank) or rank == '') and (pd.isna(score) or score == ''):
-        return False
-    
-    return True
-
 def display_lead_results(df, competition_name):
     """Display lead competition results with enhanced formatting"""
     status, status_emoji = get_competition_status(df, competition_name)
@@ -778,27 +754,26 @@ def display_lead_results(df, competition_name):
     
     # Filter out empty rows and scoring reference rows safely
     try:
+        # Use simple filtering without any complex patterns
         active_df = df[
             df['Name'].notna() & 
             (df['Name'] != '') & 
             (~df['Name'].astype(str).str.isdigit()) &
             (~df['Name'].astype(str).str.contains('Hold for', na=False)) &
             (~df['Name'].astype(str).str.contains('Min to', na=False)) &
-            (~df['Name'].astype(str).str.contains('Athlete', na=False)) &  # Remove "Athlete XX" placeholder rows
-            (~df['Name'].astype(str).str.contains('TBD', na=False)) &  # Remove TBD entries
-            (~df['Name'].astype(str).str.contains('TBA', na=False))  # Remove TBA entries
+            (~df['Name'].astype(str).str.contains('TBD', na=False)) &
+            (~df['Name'].astype(str).str.contains('TBA', na=False))
         ]
         
-        # Apply the fixed real athlete filter
-        active_df = active_df[active_df.apply(is_real_athlete, axis=1)]
+        # Filter out placeholder athletes using simple string matching
+        active_df = active_df[~active_df['Name'].apply(is_placeholder_athlete)]
         
     except Exception as e:
         logger.error(f"Error filtering data: {e}")
-        # Simple fallback filtering without any regex patterns
+        # Simplest possible fallback
         active_df = df[
             df['Name'].notna() & 
-            (df['Name'] != '') & 
-            (~df['Name'].astype(str).str.contains('Athlete', na=False)) &
+            (df['Name'] != '') &
             (~df['Name'].astype(str).str.contains('Hold for', na=False)) &
             (~df['Name'].astype(str).str.contains('Min to', na=False))
         ]
@@ -1011,39 +986,6 @@ def main():
         help="Filter by competition round"
     )
     
-    # Add export functionality
-    st.sidebar.markdown("### 📁 Data Export")
-    if st.sidebar.button("📥 Export Current Data"):
-        try:
-            # Get current filtered competitions
-            filtered_competitions = get_filtered_competitions(competition_type, gender_filter, round_filter)
-            
-            if filtered_competitions:
-                # Create a combined dataframe
-                all_data = []
-                for comp_name, url in filtered_competitions.items():
-                    df = load_sheet_data(url)
-                    if not df.empty:
-                        df['Competition'] = comp_name
-                        all_data.append(df)
-                
-                if all_data:
-                    combined_df = pd.concat(all_data, ignore_index=True)
-                    csv = combined_df.to_csv(index=False)
-                    
-                    st.sidebar.download_button(
-                        label="⬇️ Download CSV",
-                        data=csv,
-                        file_name=f"ifsc_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.sidebar.warning("No data available for export")
-            else:
-                st.sidebar.warning("No competitions selected")
-        except Exception as e:
-            st.sidebar.error(f"Export failed: {e}")
-    
     # Filter competitions
     filtered_competitions = get_filtered_competitions(competition_type, gender_filter, round_filter)
     
@@ -1158,10 +1100,9 @@ if __name__ == "__main__":
         st.error(f"🚫 Application Error: {e}")
         st.markdown("Please refresh the page or contact support if the issue persists.")
         
-        # Show debug information in expander if debug mode is enabled
-        if CONFIG['DEBUG_MODE']:
-            with st.expander("🔧 Debug Information"):
-                st.code(f"Error: {e}")
-                st.code(f"Time: {datetime.now()}")
-                import traceback
-                st.code(traceback.format_exc())
+        # Show debug information in expander
+        with st.expander("🔧 Debug Information"):
+            st.code(f"Error: {e}")
+            st.code(f"Time: {datetime.now()}")
+            import traceback
+            st.code(traceback.format_exc())
