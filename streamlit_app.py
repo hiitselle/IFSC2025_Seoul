@@ -1266,18 +1266,16 @@ def is_placeholder_athlete(name: str) -> bool:
         if remaining.isdigit():
             return True
     
-    # Check for other placeholder patterns
-    placeholder_patterns = [
-        r'^n/a$|^na
-    ,                # Not available
+placeholder_patterns = [
+        r'^n/a$|^na$',                # Not available
         r'^athlete\s+\d+',            # "Athlete 1", "Athlete 23"
         r'^climber\s+\d+',            # "Climber 1", "Climber 23"  
         r'^competitor\s+\d+',         # "Competitor 1"
         r'^\d+',                      # Just numbers
         r'^\d+\.\d+',                 # Decimal numbers
         r'^\d+\+',                    # "25+"
-        r'^tbd$|^tba',               # To be determined/announced
-        r'^n\/a$|^na',               # Not available
+        r'^tbd$|^tba$',               # To be determined/announced
+        r'^n\/a$|^na$',               # Not available
         r'^hold\s+\d+',               # "Hold 25"
         r'^zone\s+\d+',               # "Zone 40"
         r'^top\s+\d+',                # "Top 50"
