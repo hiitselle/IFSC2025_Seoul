@@ -301,15 +301,6 @@ def clean_text(text):
         logger.warning(f"Error cleaning text '{text}': {e}")
         return str(text) if text is not None else ""
 
-def safe_dataframe_operation(df, operation_name, operation_func):
-    """Safely perform dataframe operations with fallback"""
-    try:
-        return operation_func(df)
-    except Exception as e:
-        logger.error(f"Error in {operation_name}: {e}")
-        st.warning(f"⚠️ Issue with {operation_name}, showing raw data")
-        return df  # Return original dataframe as fallback
-
 def validate_dataframe(df, expected_columns):
     """Validate DataFrame has expected structure"""
     if df.empty:
@@ -803,11 +794,11 @@ def display_lead_results(df, competition_name):
         
     except Exception as e:
         logger.error(f"Error filtering data: {e}")
-        # Fallback filtering
+        # Simple fallback filtering without regex
         active_df = df[
             df['Name'].notna() & 
             (df['Name'] != '') & 
-            (~df['Name'].astype(str).str.contains('Athlete \d+', na=False, regex=True))
+            (~df['Name'].astype(str).str.contains('Athlete', na=False))
         ]
     
     # Display enhanced metrics
