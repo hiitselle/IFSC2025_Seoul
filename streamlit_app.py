@@ -794,11 +794,13 @@ def display_lead_results(df, competition_name):
         
     except Exception as e:
         logger.error(f"Error filtering data: {e}")
-        # Simple fallback filtering without regex
+        # Simple fallback filtering without any regex patterns
         active_df = df[
             df['Name'].notna() & 
             (df['Name'] != '') & 
-            (~df['Name'].astype(str).str.contains('Athlete', na=False))
+            (~df['Name'].astype(str).str.contains('Athlete', na=False)) &
+            (~df['Name'].astype(str).str.contains('Hold for', na=False)) &
+            (~df['Name'].astype(str).str.contains('Min to', na=False))
         ]
     
     # Display enhanced metrics
