@@ -1258,7 +1258,7 @@ def validate_lead_athletes(df: pd.DataFrame, expected_max: int) -> pd.DataFrame:
 
 def is_placeholder_athlete(name: str) -> bool:
     """Check if name is a placeholder or reference entry"""
-    import re  # ← Move to the beginning of the function, proper indentation
+     # ← Move to the beginning of the function, proper indentation
     
     name_str = str(name).strip().lower()
     
