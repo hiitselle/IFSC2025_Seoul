@@ -613,11 +613,11 @@ def display_boulder_results(df, competition_name):
             # Get worst possible finish number
             worst_finish_num = None
             if worst_finish_display:
-                # Use simple string operations instead of regex
+                # Extract number from "Worst Finish: X.X" format
                 worst_parts = worst_finish_display.split("Worst Finish: ")
                 if len(worst_parts) > 1:
                     try:
-                        worst_finish_num = int(worst_parts[1])
+                        worst_finish_num = float(worst_parts[1])
                     except:
                         pass
             
@@ -633,21 +633,30 @@ def display_boulder_results(df, competition_name):
                             card_class = "podium-contention"  # Yellow - could drop off podium
                             position_emoji = "⚠️"
                     elif rank_num > 3:
-                        card_class = "no-podium"  # Red - out of podium positions
-                        position_emoji = "❌"
+                        if worst_finish_num and worst_finish_num > 3:
+                            card_class = "no-podium"  # Red - out of podium positions
+                            position_emoji = "❌"
+                        else:
+                            card_class = "podium-contention"  # Yellow - still could make podium
+                            position_emoji = "⚠️"
                         
                 elif "Semis" in competition_name:
                     # For Semis, use qualification-based coloring (top 8)
-                    if rank_num > 0 and rank_num <= 8:
-                        if worst_finish_num and worst_finish_num <= 8:
-                            card_class = "qualified"  # Green - safe qualification
+                    if worst_finish_num:
+                        if worst_finish_num <= 8:
+                            card_class = "qualified"  # Green - safe qualification to finals
                             position_emoji = "✅"
                         else:
-                            card_class = "podium-contention"  # Yellow - could drop out of top 8
-                            position_emoji = "⚠️"
-                    elif rank_num > 8:
-                        card_class = "eliminated"  # Red - out of qualifying positions
-                        position_emoji = "❌"
+                            card_class = "eliminated"  # Red - will not qualify for finals
+                            position_emoji = "❌"
+                    else:
+                        # Fallback to rank-based coloring if no worst finish available
+                        if rank_num > 0 and rank_num <= 8:
+                            card_class = "qualified"
+                            position_emoji = "✅"
+                        elif rank_num > 8:
+                            card_class = "eliminated"
+                            position_emoji = "❌"
                 
                 else:
                     # For other competitions, use standard rank-based coloring
