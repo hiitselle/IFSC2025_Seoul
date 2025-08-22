@@ -1155,14 +1155,14 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
         expected_max = 24 if "Semis" in competition_name else 8 if "Final" in competition_name else 50
         
         # First pass: Remove obvious non-athlete rows
-       filtered_df = df[
+        filtered_df = df[
             df['Name'].notna() & 
             (df['Name'] != '') & 
             (~df['Name'].astype(str).str.isdigit()) &
             (~df['Name'].astype(str).str.contains('Hold for|Min to|Qualification|Threshold|Zone|Top|TBD|TBA', na=False, case=False)) &
             (~df['Name'].astype(str).str.startswith(('Hold', 'Min', '#', 'Athlete '), na=False)) &
-            (~df['Name'].astype(str).str.match(r'^\d+\.?\d*$', na=False)) &  # Remove pure numbers and decimals
-            (~df['Name'].astype(str).str.match(r'^\d+\+', na=False)) &      # Remove "25+" style entries
+            (~df['Name'].astype(str).str.match(r'^\d+\.?\d*$', na=False)) &
+            (~df['Name'].astype(str).str.match(r'^\d+\+', na=False)) &
             (~df['Name'].apply(is_placeholder_athlete))
         ]
         
