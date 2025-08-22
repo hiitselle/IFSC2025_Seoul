@@ -647,16 +647,29 @@ def display_boulder_results(df, competition_name):
                             card_class = "qualified"  # Green - safe qualification to finals
                             position_emoji = "✅"
                         else:
-                            card_class = "eliminated"  # Red - will not qualify for finals
-                            position_emoji = "❌"
+                            # Check if they're currently in top 8 or if they haven't completed all boulders
+                            if rank_num <= 8 or completed_boulders < 4:
+                                card_class = "podium-contention"  # Yellow - still in contention for top 8
+                                position_emoji = "⚠️"
+                            else:
+                                card_class = "eliminated"  # Red - will not qualify for finals
+                                position_emoji = "❌"
                     else:
                         # Fallback to rank-based coloring if no worst finish available
                         if rank_num > 0 and rank_num <= 8:
-                            card_class = "qualified"
-                            position_emoji = "✅"
+                            if completed_boulders < 4:
+                                card_class = "podium-contention"  # Yellow - still climbing, position could change
+                                position_emoji = "⚠️"
+                            else:
+                                card_class = "qualified"  # Green - finished and in top 8
+                                position_emoji = "✅"
                         elif rank_num > 8:
-                            card_class = "eliminated"
-                            position_emoji = "❌"
+                            if completed_boulders < 4:
+                                card_class = "podium-contention"  # Yellow - still possible to reach top 8
+                                position_emoji = "⚠️"
+                            else:
+                                card_class = "eliminated"  # Red - finished outside top 8
+                                position_emoji = "❌"
                 
                 else:
                     # For other competitions, use standard rank-based coloring
@@ -692,6 +705,8 @@ def display_boulder_results(df, competition_name):
                     strategy_cols['2nd'] = col
                 elif '3rd Place Strategy' in col_str or '3rd Place Strate' in col_str:
                     strategy_cols['3rd'] = col
+                elif 'Points Needed for Top 8' in col_str:
+                    strategy_cols['top8'] = col
             
             if strategy_cols:
                 strategies = []
@@ -706,6 +721,8 @@ def display_boulder_results(df, competition_name):
                                 strategies.append(f"🥈 2nd: {strategy_clean}")
                             elif place == '3rd':
                                 strategies.append(f"🥉 3rd: {strategy_clean}")
+                            elif place == 'top8' and "Semis" in competition_name:
+                                strategies.append(f"🎯 Top 8: {strategy_clean}")
                 
                 if strategies:
                     comp_type = "Final" if "Final" in competition_name else "Semi"
@@ -972,7 +989,7 @@ def main():
     
     # Last refresh time
     time_since_refresh = datetime.now() - st.session_state.last_refresh
-    st.sidebar.caption(f"🕒 Last refresh: {time_since_refresh.seconds}s ago")
+    st.sidebar.caption(f"🕐 Last refresh: {time_since_refresh.seconds}s ago")
     
     # Competition filters with enhanced UI
     st.sidebar.markdown("### 🎯 Competition Filters")
