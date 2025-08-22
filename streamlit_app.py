@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timedelta
 import logging
 import re
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -251,13 +252,29 @@ SHEETS_URLS = {
     "Female Lead Final": "https://docs.google.com/spreadsheets/d/1MwVp1mBUoFrzRSIIu4UdMcFlXpxHAi_R7ztp1E4Vgx0/export?format=csv&gid=528108640"
 }
 
-# Configuration
+# Environment-based configuration
 CONFIG = {
-    'CACHE_TTL': 30,
-    'AUTO_REFRESH_INTERVAL': 60,  # Increased to 60 seconds for better performance
-    'MAX_RETRIES': 3,
-    'REQUEST_TIMEOUT': 15,
+    'CACHE_TTL': int(os.getenv('CACHE_TTL', 30)),
+    'AUTO_REFRESH_INTERVAL': int(os.getenv('AUTO_REFRESH_INTERVAL', 60)),
+    'MAX_RETRIES': int(os.getenv('MAX_RETRIES', 3)),
+    'REQUEST_TIMEOUT': int(os.getenv('REQUEST_TIMEOUT', 15)),
+    'DEBUG_MODE': os.getenv('DEBUG_MODE', 'False').lower() == 'true'
 }
+
+def get_session():
+    """Create a requests session with connection pooling for better performance"""
+    session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(
+        pool_connections=10,
+        pool_maxsize=20,
+        max_retries=CONFIG['MAX_RETRIES']
+    )
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
+# Create a global session for reuse
+session = get_session()
 
 def safe_numeric_conversion(value, default=0):
     """Safely convert value to numeric with proper error handling"""
@@ -270,40 +287,28 @@ def safe_numeric_conversion(value, default=0):
         return default
 
 def clean_text(text):
-    """Clean text by removing unwanted characters and normalizing"""
+    """Simplified and more robust text cleaning"""
     if not isinstance(text, str):
         return str(text) if text is not None else ""
     
     try:
-        # Start with the original text
-        cleaned = text
-        
-        # Remove specific garbled sequences commonly seen
-        garbled_patterns = [
-            'ÃÃ', 'Ã¡', 'Ã¢', 'Ã¤', 'Ã©', 'Ãª', 'Ãë', 'Ãí', 'Ãî', 'Ãï',
-            'Ãó', 'Ãô', 'Ãö', 'Ãº', 'Ãû', 'Ãü', 'Ãÿ', 'Ã ', 'Ã¿',
-            'âÂ', 'â€Â', 'â€™', 'â€œ', 'â€Â', 'â€Å"', 'â€šÂ', 'â€žÂ',
-            'Âª', 'Â°', 'Â±', 'Â²', 'Â³', 'Â¼', 'Â½', 'Â¾', 'Â¿', 'Ã', 'Â'
-        ]
-        
-        for pattern in garbled_patterns:
-            cleaned = cleaned.replace(pattern, '')
-        
-        # Clean up extra spaces that might result from removals
+        # Remove encoding artifacts using ASCII conversion
+        cleaned = text.encode('ascii', 'ignore').decode('ascii')
+        # Clean up whitespace
         cleaned = ' '.join(cleaned.split())
-        
-        # Remove any remaining non-ASCII characters that look like encoding artifacts
-        import re
-        # Keep only ASCII letters, numbers, spaces, and common punctuation
-        cleaned = re.sub(r'[^\x00-\x7F]+', '', cleaned)
-        
-        # Clean up any double spaces
-        cleaned = re.sub(r'\s+', ' ', cleaned)
-        
         return cleaned.strip()
     except Exception as e:
         logger.warning(f"Error cleaning text '{text}': {e}")
         return str(text) if text is not None else ""
+
+def safe_dataframe_operation(df, operation_name, operation_func):
+    """Safely perform dataframe operations with fallback"""
+    try:
+        return operation_func(df)
+    except Exception as e:
+        logger.error(f"Error in {operation_name}: {e}")
+        st.warning(f"⚠️ Issue with {operation_name}, showing raw data")
+        return df  # Return original dataframe as fallback
 
 def validate_dataframe(df, expected_columns):
     """Validate DataFrame has expected structure"""
@@ -349,7 +354,7 @@ def get_competition_status(df, competition_name):
     
     return "upcoming", "📄"
 
-@st.cache_data(ttl=CONFIG['CACHE_TTL'])
+@st.cache_data(ttl=CONFIG['CACHE_TTL'], max_entries=10)
 def load_sheet_data(url, retries=0):
     """Load data from Google Sheets CSV export URL with enhanced error handling"""
     try:
@@ -357,7 +362,7 @@ def load_sheet_data(url, retries=0):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
-        response = requests.get(
+        response = session.get(
             url, 
             timeout=CONFIG['REQUEST_TIMEOUT'],
             headers=headers
@@ -725,6 +730,26 @@ def display_boulder_results(df, competition_name):
         </div>
         """, unsafe_allow_html=True)
 
+def is_real_athlete(row):
+    """Fixed function to determine if a row represents a real athlete"""
+    name = str(row.get('Name', '')).strip()
+    rank = row.get('Current Rank', '')
+    score = row.get('Manual Score', '')
+    
+    # If name is empty or placeholder-like, it's not real
+    if not name or name.lower() in ['athlete', 'tbd', 'tba']:
+        return False
+    
+    # Fixed: Complete the regex pattern to match "Athlete XX" format
+    if re.match(r'^Athlete \d+, name):
+        return False
+    
+    # If no rank AND no score, likely not a real athlete
+    if (pd.isna(rank) or rank == '') and (pd.isna(score) or score == ''):
+        return False
+    
+    return True
+
 def display_lead_results(df, competition_name):
     """Display lead competition results with enhanced formatting"""
     status, status_emoji = get_competition_status(df, competition_name)
@@ -769,692 +794,11 @@ def display_lead_results(df, competition_name):
             (~df['Name'].astype(str).str.contains('Hold for', na=False)) &
             (~df['Name'].astype(str).str.contains('Min to', na=False)) &
             (~df['Name'].astype(str).str.contains('Athlete', na=False)) &  # Remove "Athlete XX" placeholder rows
-            (~df['Name'].astype(str).str.match(r'^Athlete \d+
-    
-    # Display enhanced metrics
-    display_enhanced_metrics(active_df, competition_name)
-    
-    st.markdown("#### 📋 Current Standings")
-    
-    # Show qualification thresholds if available
-    if qualification_info:
-        threshold_items = []
-        threshold_mapping = {
-            'Hold for 1st': ('🥇 1st', '#FFD700'),
-            'Hold for 2nd': ('🥈 2nd', '#C0C0C0'),
-            'Hold for 3rd': ('🥉 3rd', '#CD7F32'),
-            'Hold to Qualify': ('✅ Qualify', '#28a745'),
-            'Min to Qualify': ('⚠️ Min', '#ffc107')
-        }
-        
-        for key, value in qualification_info.items():
-            if key in threshold_mapping:
-                label, color = threshold_mapping[key]
-                threshold_items.append(f'<span style="color: {color}; font-weight: bold;">{label}: {value}</span>')
-        
-        if threshold_items:
-            st.markdown(f"""
-            <div class="threshold-card">
-                <h5>🎯 Qualification Thresholds</h5>
-                {' | '.join(threshold_items)}
-            </div>
-            """, unsafe_allow_html=True)
-    
-    # Sort by Current Rank if available
-    try:
-        if 'Current Rank' in active_df.columns:
-            active_df['Current Rank'] = pd.to_numeric(active_df['Current Rank'], errors='coerce')
-            active_df = active_df.sort_values('Current Rank', ascending=True).reset_index(drop=True)
-    except Exception as e:
-        logger.warning(f"Could not sort by rank: {e}")
-    
-    # Display results with enhanced formatting
-    for idx, row in active_df.iterrows():
-        name = clean_text(str(row.get('Name', 'Unknown')))
-        score = row.get('Manual Score', 'N/A')
-        rank = row.get('Current Rank', 'N/A')
-        status = clean_text(str(row.get('Status', 'Unknown')))
-        worst_finish = row.get('Worst Finish', 'N/A')
-        
-        # Determine if athlete has a score or is awaiting result
-        has_score = score not in ['N/A', '', None] and not pd.isna(score)
-        
-        # If no score yet and we have qualification info, show thresholds
-        threshold_display = ""
-        if not has_score and qualification_info:
-            thresholds = []
-            if 'Hold for 1st' in qualification_info:
-                thresholds.append(f'🥇 1st: {qualification_info["Hold for 1st"]}')
-            if 'Hold for 2nd' in qualification_info:
-                thresholds.append(f'🥈 2nd: {qualification_info["Hold for 2nd"]}')
-            if 'Hold for 3rd' in qualification_info:
-                thresholds.append(f'🥉 3rd: {qualification_info["Hold for 3rd"]}')
-            if 'Hold to Podium' in qualification_info:
-                thresholds.append(f'🏆 Podium: {qualification_info["Hold to Podium"]}')
-            if 'Min to Podium' in qualification_info:
-                thresholds.append(f'⚠️ Min: {qualification_info["Min to Podium"]}')
-            
-            if thresholds:
-                threshold_display = f"<br><div class='targets'><strong>Targets:</strong> {' | '.join(thresholds)}</div>"
-        
-        # Get status styling
-        status_emoji = get_status_emoji(status)
-        
-        # Determine card class based on status and score availability - only color if has score
-        card_class = ""
-        position_emoji = ""
-        
-        if has_score:
-            if "Qualified" in status or "✓✓" in status:
-                card_class = "qualified"
-                status_emoji = "✅"
-            elif "Eliminated" in status or "✗" in status:
-                card_class = "eliminated"
-                status_emoji = "❌"
-            elif "Podium" in status and "No Podium" not in status and "Contention" not in status:
-                card_class = "podium-position"
-                status_emoji = "🏆"
-            elif "Podium Contention" in status or "Contention" in status:
-                card_class = "podium-contention"
-                status_emoji = "⚠️"
-            elif "No Podium" in status:
-                card_class = "no-podium"
-                status_emoji = "❌"
-        
-        # Set position emoji
-        rank_num = safe_numeric_conversion(rank)
-        if rank_num > 0:
-            if has_score and card_class:
-                position_emoji = status_emoji
-            else:
-                position_emoji = f"#{rank_num}"
-        
-        # Show score if available, otherwise show "Awaiting Result"
-        score_display = score if has_score else "Awaiting Result"
-        
-        # Add worst finish info if athlete has a score
-        worst_finish_display = ""
-        if has_score and worst_finish not in ['N/A', '', None] and not pd.isna(worst_finish):
-            worst_finish_clean = clean_text(str(worst_finish))
-            if worst_finish_clean and worst_finish_clean != '-':
-                worst_finish_display = f" | Worst Finish: {worst_finish_clean}"
-        
-        st.markdown(f"""
-        <div class="athlete-row {card_class}">
-            <strong>{position_emoji} #{rank} - {name}</strong><br>
-            <small>Score: {score_display} | Status: {status}{worst_finish_display}</small>{threshold_display}
-        </div>
-        """, unsafe_allow_html=True)
-
-def get_filtered_competitions(competition_type, gender_filter, round_filter):
-    """Get filtered competitions based on user selection"""
-    filtered_competitions = {}
-    
-    for name, url in SHEETS_URLS.items():
-        include = True
-        
-        if competition_type != "All":
-            if competition_type.lower() not in name.lower():
-                include = False
-        
-        if gender_filter != "All":
-            if gender_filter.lower() not in name.lower():
-                include = False
-                
-        if round_filter != "All":
-            if round_filter.lower() not in name.lower():
-                include = False
-        
-        if include:
-            filtered_competitions[name] = url
-    
-    return filtered_competitions
-
-def main():
-    """Main application function with enhanced features"""
-    
-    # Initialize session state for auto-refresh
-    if 'last_refresh' not in st.session_state:
-        st.session_state.last_refresh = datetime.now()
-    if 'auto_refresh_enabled' not in st.session_state:
-        st.session_state.auto_refresh_enabled = True
-    
-    # Header with enhanced styling
-    st.markdown("""
-    <div class="main-header">
-        <h1>🧗‍♂️ IFSC 2025 World Championships</h1>
-        <h3>Live Competition Results Dashboard</h3>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Sidebar with enhanced controls
-    st.sidebar.title("🏆 Competition Control Center")
-    
-    # Auto-refresh controls
-    st.sidebar.markdown("### 🔄 Auto-Refresh Settings")
-    auto_refresh = st.sidebar.checkbox(
-        "Enable Auto-Refresh", 
-        value=st.session_state.auto_refresh_enabled,
-        help=f"Automatically refresh data every {CONFIG['AUTO_REFRESH_INTERVAL']} seconds"
-    )
-    st.session_state.auto_refresh_enabled = auto_refresh
-    
-    # Manual refresh with enhanced feedback
-    refresh_col1, refresh_col2 = st.sidebar.columns(2)
-    with refresh_col1:
-        if st.button("🔄 Refresh Now", type="primary"):
-            st.cache_data.clear()
-            st.session_state.last_refresh = datetime.now()
-            st.sidebar.success("✅ Data refreshed!")
-            time.sleep(1)
-            st.rerun()
-    
-    with refresh_col2:
-        if st.button("🗑️ Clear Cache"):
-            st.cache_data.clear()
-            st.sidebar.success("✅ Cache cleared!")
-    
-    # Last refresh time
-    time_since_refresh = datetime.now() - st.session_state.last_refresh
-    st.sidebar.caption(f"🕐 Last refresh: {time_since_refresh.seconds}s ago")
-    
-    # Competition filters with enhanced UI
-    st.sidebar.markdown("### 🎯 Competition Filters")
-    
-    competition_type = st.sidebar.selectbox(
-        "🏔️ Competition Type",
-        ["All", "Boulder", "Lead"],
-        help="Filter by climbing discipline"
-    )
-    
-    gender_filter = st.sidebar.selectbox(
-        "👤 Gender Category",
-        ["All", "Male", "Female"],
-        help="Filter by gender category"
-    )
-    
-    round_filter = st.sidebar.selectbox(
-        "🎯 Competition Round",
-        ["All", "Semis", "Final"],
-        help="Filter by competition round"
-    )
-    
-    # Filter competitions
-    filtered_competitions = get_filtered_competitions(competition_type, gender_filter, round_filter)
-    
-    # Main content area
-    if len(filtered_competitions) == 0:
-        st.markdown("""
-        <div class="error-card">
-            <h3>⚠️ No Competitions Found</h3>
-            <p>No competitions match your current filter settings. Please adjust your filters to see results.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        return
-    
-    # Quick overview with enhanced metrics
-    st.markdown("### 🚀 Competition Overview")
-    
-    # Calculate overview metrics
-    total_competitions = len(filtered_competitions)
-    live_competitions = 0
-    completed_competitions = 0
-    upcoming_competitions = 0
-    
-    for comp_name, url in filtered_competitions.items():
-        df = load_sheet_data(url)
-        status, _ = get_competition_status(df, comp_name)
-        if status == "live":
-            live_competitions += 1
-        elif status == "completed":
-            completed_competitions += 1
-        else:
-            upcoming_competitions += 1
-    
-    # Overview metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f'<div class="metric-card"><h4>🏆 Total Competitions</h4><h2>{total_competitions}</h2></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown(f'<div class="metric-card"><h4>🔴 Live</h4><h2>{live_competitions}</h2></div>', unsafe_allow_html=True)
-    with col3:
-        st.markdown(f'<div class="metric-card"><h4>✅ Completed</h4><h2>{completed_competitions}</h2></div>', unsafe_allow_html=True)
-    with col4:
-        st.markdown(f'<div class="metric-card"><h4>📄 Upcoming</h4><h2>{upcoming_competitions}</h2></div>', unsafe_allow_html=True)
-    
-    # Detailed results with enhanced presentation
-    st.markdown("### 📊 Live Competition Results")
-    
-    # Handle single vs multiple competitions
-    if len(filtered_competitions) > 1:
-        # Create tabs for multiple competitions
-        tab_names = list(filtered_competitions.keys())
-        tabs = st.tabs(tab_names)
-        
-        for i, (comp_name, url) in enumerate(filtered_competitions.items()):
-            with tabs[i]:
-                with st.spinner(f"Loading {comp_name}..."):
-                    df = load_sheet_data(url)
-                    
-                current_time = datetime.now().strftime("%H:%M:%S")
-                st.caption(f"📡 Last updated: {current_time}")
-                
-                if "Boulder" in comp_name:
-                    display_boulder_results(df, comp_name)
-                elif "Lead" in comp_name:
-                    display_lead_results(df, comp_name)
-                else:
-                    if not df.empty:
-                        st.dataframe(df, use_container_width=True, hide_index=True)
-                    else:
-                        st.markdown('<div class="error-card">❌ No data available</div>', unsafe_allow_html=True)
-    else:
-        # Single competition view
-        comp_name, url = list(filtered_competitions.items())[0]
-        
-        with st.spinner(f"Loading {comp_name}..."):
-            df = load_sheet_data(url)
-            
-        current_time = datetime.now().strftime("%H:%M:%S")
-        st.caption(f"📡 Last updated: {current_time}")
-        
-        if "Boulder" in comp_name:
-            display_boulder_results(df, comp_name)
-        elif "Lead" in comp_name:
-            display_lead_results(df, comp_name)
-        else:
-            if not df.empty:
-                st.dataframe(df, use_container_width=True, hide_index=True)
-            else:
-                st.markdown('<div class="error-card">❌ No data available</div>', unsafe_allow_html=True)
-    
-    # Footer with additional information
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("**🏔️ IFSC World Championships 2025**")
-    with col2:
-        st.markdown("**📊 Real-time Results Dashboard**")
-    with col3:
-        st.markdown("**🔄 Auto-updating data**")
-    
-    # Auto-refresh logic (improved)
-    if st.session_state.auto_refresh_enabled:
-        time_since_last = (datetime.now() - st.session_state.last_refresh).total_seconds()
-        if time_since_last >= CONFIG['AUTO_REFRESH_INTERVAL']:
-            st.session_state.last_refresh = datetime.now()
-            st.rerun()
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logger.error(f"Application error: {e}")
-        st.error(f"🚫 Application Error: {e}")
-        st.markdown("Please refresh the page or contact support if the issue persists.")
-        
-        # Show debug information in expander
-        with st.expander("🔧 Debug Information"):
-            st.code(f"Error: {e}")
-            st.code(f"Time: {datetime.now()}")
-            import traceback
-            st.code(traceback.format_exc()), na=False)) &  # Remove exact "Athlete [number]" pattern
-            (df['Name'].astype(str).str.strip() != 'Athlete') &  # Remove just "Athlete"
             (~df['Name'].astype(str).str.contains('TBD', na=False)) &  # Remove TBD entries
             (~df['Name'].astype(str).str.contains('TBA', na=False))  # Remove TBA entries
         ]
         
-        # Additional filtering: Remove rows where name looks like a placeholder
-        # and there's no score or rank data
-        def is_real_athlete(row):
-            name = str(row.get('Name', '')).strip()
-            rank = row.get('Current Rank', '')
-            score = row.get('Manual Score', '')
-            
-            # If name is empty or placeholder-like, it's not real
-            if not name or name.lower() in ['athlete', 'tbd', 'tba']:
-                return False
-            
-            # If name is just "Athlete XX" pattern, it's not real
-            if re.match(r'^Athlete \d+
-    
-    # Display enhanced metrics
-    display_enhanced_metrics(active_df, competition_name)
-    
-    st.markdown("#### 📋 Current Standings")
-    
-    # Show qualification thresholds if available
-    if qualification_info:
-        threshold_items = []
-        threshold_mapping = {
-            'Hold for 1st': ('🥇 1st', '#FFD700'),
-            'Hold for 2nd': ('🥈 2nd', '#C0C0C0'),
-            'Hold for 3rd': ('🥉 3rd', '#CD7F32'),
-            'Hold to Qualify': ('✅ Qualify', '#28a745'),
-            'Min to Qualify': ('⚠️ Min', '#ffc107')
-        }
-        
-        for key, value in qualification_info.items():
-            if key in threshold_mapping:
-                label, color = threshold_mapping[key]
-                threshold_items.append(f'<span style="color: {color}; font-weight: bold;">{label}: {value}</span>')
-        
-        if threshold_items:
-            st.markdown(f"""
-            <div class="threshold-card">
-                <h5>🎯 Qualification Thresholds</h5>
-                {' | '.join(threshold_items)}
-            </div>
-            """, unsafe_allow_html=True)
-    
-    # Sort by Current Rank if available
-    try:
-        if 'Current Rank' in active_df.columns:
-            active_df['Current Rank'] = pd.to_numeric(active_df['Current Rank'], errors='coerce')
-            active_df = active_df.sort_values('Current Rank', ascending=True).reset_index(drop=True)
-    except Exception as e:
-        logger.warning(f"Could not sort by rank: {e}")
-    
-    # Display results with enhanced formatting
-    for idx, row in active_df.iterrows():
-        name = clean_text(str(row.get('Name', 'Unknown')))
-        score = row.get('Manual Score', 'N/A')
-        rank = row.get('Current Rank', 'N/A')
-        status = clean_text(str(row.get('Status', 'Unknown')))
-        worst_finish = row.get('Worst Finish', 'N/A')
-        
-        # Determine if athlete has a score or is awaiting result
-        has_score = score not in ['N/A', '', None] and not pd.isna(score)
-        
-        # If no score yet and we have qualification info, show thresholds
-        threshold_display = ""
-        if not has_score and qualification_info:
-            thresholds = []
-            if 'Hold for 1st' in qualification_info:
-                thresholds.append(f'🥇 1st: {qualification_info["Hold for 1st"]}')
-            if 'Hold for 2nd' in qualification_info:
-                thresholds.append(f'🥈 2nd: {qualification_info["Hold for 2nd"]}')
-            if 'Hold for 3rd' in qualification_info:
-                thresholds.append(f'🥉 3rd: {qualification_info["Hold for 3rd"]}')
-            if 'Hold to Podium' in qualification_info:
-                thresholds.append(f'🏆 Podium: {qualification_info["Hold to Podium"]}')
-            if 'Min to Podium' in qualification_info:
-                thresholds.append(f'⚠️ Min: {qualification_info["Min to Podium"]}')
-            
-            if thresholds:
-                threshold_display = f"<br><div class='targets'><strong>Targets:</strong> {' | '.join(thresholds)}</div>"
-        
-        # Get status styling
-        status_emoji = get_status_emoji(status)
-        
-        # Determine card class based on status and score availability - only color if has score
-        card_class = ""
-        position_emoji = ""
-        
-        if has_score:
-            if "Qualified" in status or "✓✓" in status:
-                card_class = "qualified"
-                status_emoji = "✅"
-            elif "Eliminated" in status or "✗" in status:
-                card_class = "eliminated"
-                status_emoji = "❌"
-            elif "Podium" in status and "No Podium" not in status and "Contention" not in status:
-                card_class = "podium-position"
-                status_emoji = "🏆"
-            elif "Podium Contention" in status or "Contention" in status:
-                card_class = "podium-contention"
-                status_emoji = "⚠️"
-            elif "No Podium" in status:
-                card_class = "no-podium"
-                status_emoji = "❌"
-        
-        # Set position emoji
-        rank_num = safe_numeric_conversion(rank)
-        if rank_num > 0:
-            if has_score and card_class:
-                position_emoji = status_emoji
-            else:
-                position_emoji = f"#{rank_num}"
-        
-        # Show score if available, otherwise show "Awaiting Result"
-        score_display = score if has_score else "Awaiting Result"
-        
-        # Add worst finish info if athlete has a score
-        worst_finish_display = ""
-        if has_score and worst_finish not in ['N/A', '', None] and not pd.isna(worst_finish):
-            worst_finish_clean = clean_text(str(worst_finish))
-            if worst_finish_clean and worst_finish_clean != '-':
-                worst_finish_display = f" | Worst Finish: {worst_finish_clean}"
-        
-        st.markdown(f"""
-        <div class="athlete-row {card_class}">
-            <strong>{position_emoji} #{rank} - {name}</strong><br>
-            <small>Score: {score_display} | Status: {status}{worst_finish_display}</small>{threshold_display}
-        </div>
-        """, unsafe_allow_html=True)
-
-def get_filtered_competitions(competition_type, gender_filter, round_filter):
-    """Get filtered competitions based on user selection"""
-    filtered_competitions = {}
-    
-    for name, url in SHEETS_URLS.items():
-        include = True
-        
-        if competition_type != "All":
-            if competition_type.lower() not in name.lower():
-                include = False
-        
-        if gender_filter != "All":
-            if gender_filter.lower() not in name.lower():
-                include = False
-                
-        if round_filter != "All":
-            if round_filter.lower() not in name.lower():
-                include = False
-        
-        if include:
-            filtered_competitions[name] = url
-    
-    return filtered_competitions
-
-def main():
-    """Main application function with enhanced features"""
-    
-    # Initialize session state for auto-refresh
-    if 'last_refresh' not in st.session_state:
-        st.session_state.last_refresh = datetime.now()
-    if 'auto_refresh_enabled' not in st.session_state:
-        st.session_state.auto_refresh_enabled = True
-    
-    # Header with enhanced styling
-    st.markdown("""
-    <div class="main-header">
-        <h1>🧗‍♂️ IFSC 2025 World Championships</h1>
-        <h3>Live Competition Results Dashboard</h3>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Sidebar with enhanced controls
-    st.sidebar.title("🏆 Competition Control Center")
-    
-    # Auto-refresh controls
-    st.sidebar.markdown("### 🔄 Auto-Refresh Settings")
-    auto_refresh = st.sidebar.checkbox(
-        "Enable Auto-Refresh", 
-        value=st.session_state.auto_refresh_enabled,
-        help=f"Automatically refresh data every {CONFIG['AUTO_REFRESH_INTERVAL']} seconds"
-    )
-    st.session_state.auto_refresh_enabled = auto_refresh
-    
-    # Manual refresh with enhanced feedback
-    refresh_col1, refresh_col2 = st.sidebar.columns(2)
-    with refresh_col1:
-        if st.button("🔄 Refresh Now", type="primary"):
-            st.cache_data.clear()
-            st.session_state.last_refresh = datetime.now()
-            st.sidebar.success("✅ Data refreshed!")
-            time.sleep(1)
-            st.rerun()
-    
-    with refresh_col2:
-        if st.button("🗑️ Clear Cache"):
-            st.cache_data.clear()
-            st.sidebar.success("✅ Cache cleared!")
-    
-    # Last refresh time
-    time_since_refresh = datetime.now() - st.session_state.last_refresh
-    st.sidebar.caption(f"🕐 Last refresh: {time_since_refresh.seconds}s ago")
-    
-    # Competition filters with enhanced UI
-    st.sidebar.markdown("### 🎯 Competition Filters")
-    
-    competition_type = st.sidebar.selectbox(
-        "🏔️ Competition Type",
-        ["All", "Boulder", "Lead"],
-        help="Filter by climbing discipline"
-    )
-    
-    gender_filter = st.sidebar.selectbox(
-        "👤 Gender Category",
-        ["All", "Male", "Female"],
-        help="Filter by gender category"
-    )
-    
-    round_filter = st.sidebar.selectbox(
-        "🎯 Competition Round",
-        ["All", "Semis", "Final"],
-        help="Filter by competition round"
-    )
-    
-    # Filter competitions
-    filtered_competitions = get_filtered_competitions(competition_type, gender_filter, round_filter)
-    
-    # Main content area
-    if len(filtered_competitions) == 0:
-        st.markdown("""
-        <div class="error-card">
-            <h3>⚠️ No Competitions Found</h3>
-            <p>No competitions match your current filter settings. Please adjust your filters to see results.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        return
-    
-    # Quick overview with enhanced metrics
-    st.markdown("### 🚀 Competition Overview")
-    
-    # Calculate overview metrics
-    total_competitions = len(filtered_competitions)
-    live_competitions = 0
-    completed_competitions = 0
-    upcoming_competitions = 0
-    
-    for comp_name, url in filtered_competitions.items():
-        df = load_sheet_data(url)
-        status, _ = get_competition_status(df, comp_name)
-        if status == "live":
-            live_competitions += 1
-        elif status == "completed":
-            completed_competitions += 1
-        else:
-            upcoming_competitions += 1
-    
-    # Overview metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f'<div class="metric-card"><h4>🏆 Total Competitions</h4><h2>{total_competitions}</h2></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown(f'<div class="metric-card"><h4>🔴 Live</h4><h2>{live_competitions}</h2></div>', unsafe_allow_html=True)
-    with col3:
-        st.markdown(f'<div class="metric-card"><h4>✅ Completed</h4><h2>{completed_competitions}</h2></div>', unsafe_allow_html=True)
-    with col4:
-        st.markdown(f'<div class="metric-card"><h4>📄 Upcoming</h4><h2>{upcoming_competitions}</h2></div>', unsafe_allow_html=True)
-    
-    # Detailed results with enhanced presentation
-    st.markdown("### 📊 Live Competition Results")
-    
-    # Handle single vs multiple competitions
-    if len(filtered_competitions) > 1:
-        # Create tabs for multiple competitions
-        tab_names = list(filtered_competitions.keys())
-        tabs = st.tabs(tab_names)
-        
-        for i, (comp_name, url) in enumerate(filtered_competitions.items()):
-            with tabs[i]:
-                with st.spinner(f"Loading {comp_name}..."):
-                    df = load_sheet_data(url)
-                    
-                current_time = datetime.now().strftime("%H:%M:%S")
-                st.caption(f"📡 Last updated: {current_time}")
-                
-                if "Boulder" in comp_name:
-                    display_boulder_results(df, comp_name)
-                elif "Lead" in comp_name:
-                    display_lead_results(df, comp_name)
-                else:
-                    if not df.empty:
-                        st.dataframe(df, use_container_width=True, hide_index=True)
-                    else:
-                        st.markdown('<div class="error-card">❌ No data available</div>', unsafe_allow_html=True)
-    else:
-        # Single competition view
-        comp_name, url = list(filtered_competitions.items())[0]
-        
-        with st.spinner(f"Loading {comp_name}..."):
-            df = load_sheet_data(url)
-            
-        current_time = datetime.now().strftime("%H:%M:%S")
-        st.caption(f"📡 Last updated: {current_time}")
-        
-        if "Boulder" in comp_name:
-            display_boulder_results(df, comp_name)
-        elif "Lead" in comp_name:
-            display_lead_results(df, comp_name)
-        else:
-            if not df.empty:
-                st.dataframe(df, use_container_width=True, hide_index=True)
-            else:
-                st.markdown('<div class="error-card">❌ No data available</div>', unsafe_allow_html=True)
-    
-    # Footer with additional information
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("**🏔️ IFSC World Championships 2025**")
-    with col2:
-        st.markdown("**📊 Real-time Results Dashboard**")
-    with col3:
-        st.markdown("**🔄 Auto-updating data**")
-    
-    # Auto-refresh logic (improved)
-    if st.session_state.auto_refresh_enabled:
-        time_since_last = (datetime.now() - st.session_state.last_refresh).total_seconds()
-        if time_since_last >= CONFIG['AUTO_REFRESH_INTERVAL']:
-            st.session_state.last_refresh = datetime.now()
-            st.rerun()
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logger.error(f"Application error: {e}")
-        st.error(f"🚫 Application Error: {e}")
-        st.markdown("Please refresh the page or contact support if the issue persists.")
-        
-        # Show debug information in expander
-        with st.expander("🔧 Debug Information"):
-            st.code(f"Error: {e}")
-            st.code(f"Time: {datetime.now()}")
-            import traceback
-            st.code(traceback.format_exc()), name):
-                return False
-            
-            # If no rank AND no score, likely not a real athlete
-            if (pd.isna(rank) or rank == '') and (pd.isna(score) or score == ''):
-                return False
-            
-            return True
-        
-        # Apply the real athlete filter
+        # Apply the fixed real athlete filter
         active_df = active_df[active_df.apply(is_real_athlete, axis=1)]
         
     except Exception as e:
@@ -1651,7 +995,7 @@ def main():
     
     # Last refresh time
     time_since_refresh = datetime.now() - st.session_state.last_refresh
-    st.sidebar.caption(f"🕐 Last refresh: {time_since_refresh.seconds}s ago")
+    st.sidebar.caption(f"🕒 Last refresh: {time_since_refresh.seconds}s ago")
     
     # Competition filters with enhanced UI
     st.sidebar.markdown("### 🎯 Competition Filters")
@@ -1673,6 +1017,39 @@ def main():
         ["All", "Semis", "Final"],
         help="Filter by competition round"
     )
+    
+    # Add export functionality
+    st.sidebar.markdown("### 📁 Data Export")
+    if st.sidebar.button("📥 Export Current Data"):
+        try:
+            # Get current filtered competitions
+            filtered_competitions = get_filtered_competitions(competition_type, gender_filter, round_filter)
+            
+            if filtered_competitions:
+                # Create a combined dataframe
+                all_data = []
+                for comp_name, url in filtered_competitions.items():
+                    df = load_sheet_data(url)
+                    if not df.empty:
+                        df['Competition'] = comp_name
+                        all_data.append(df)
+                
+                if all_data:
+                    combined_df = pd.concat(all_data, ignore_index=True)
+                    csv = combined_df.to_csv(index=False)
+                    
+                    st.sidebar.download_button(
+                        label="⬇️ Download CSV",
+                        data=csv,
+                        file_name=f"ifsc_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.sidebar.warning("No data available for export")
+            else:
+                st.sidebar.warning("No competitions selected")
+        except Exception as e:
+            st.sidebar.error(f"Export failed: {e}")
     
     # Filter competitions
     filtered_competitions = get_filtered_competitions(competition_type, gender_filter, round_filter)
@@ -1788,9 +1165,10 @@ if __name__ == "__main__":
         st.error(f"🚫 Application Error: {e}")
         st.markdown("Please refresh the page or contact support if the issue persists.")
         
-        # Show debug information in expander
-        with st.expander("🔧 Debug Information"):
-            st.code(f"Error: {e}")
-            st.code(f"Time: {datetime.now()}")
-            import traceback
-            st.code(traceback.format_exc())
+        # Show debug information in expander if debug mode is enabled
+        if CONFIG['DEBUG_MODE']:
+            with st.expander("🔧 Debug Information"):
+                st.code(f"Error: {e}")
+                st.code(f"Time: {datetime.now()}")
+                import traceback
+                st.code(traceback.format_exc())
