@@ -1148,40 +1148,81 @@ def extract_qualification_info(df: pd.DataFrame) -> Dict[str, str]:
     return qualification_info
 
 
-# Add this debugging version of the filter_active_athletes function
-# Replace your current filter_active_athletes function with this one temporarily:
+# Replace your filter_active_athletes function with this fixed version:
 
 def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFrame:
     """Filter out reference rows to get only active athletes"""
     try:
-        # DEBUG: Log initial data
-        if "Lead Semis" in competition_name:
-            st.write(f"🔍 DEBUG: Initial dataframe has {len(df)} rows")
-            st.write("First 10 names:")
-            if 'Name' in df.columns:
-                for i, name in enumerate(df['Name'].head(10)):
-                    st.write(f"  {i+1}. '{name}'")
+        active_df = df[
+            df['Name'].notna() & 
+            (df['Name'] != '') & 
+            (~df['Name'].astype(str).str.isdigit()) &
+            (~df['Name'].astype(str).str.contains('Hold for', na=False)) &
+            (~df['Name'].astype(str).str.contains('Min to', na=False)) &
+            (~df['Name'].astype(str).str.contains('TBD|TBA|Qualification|Threshold|Zone|Top', na=False, case=False)) &
+            (~df['Name'].astype(str).str.startswith(('Hold', 'Min', '#'), na=False)) &
+            (~df['Name'].apply(is_placeholder_athlete))
+        ]
         
-        # Apply all filters step by step with debugging
-        step1 = df[df['Name'].notna()]
-        step2 = step1[step1['Name'] != '']
-        step3 = step2[~step2['Name'].astype(str).str.isdigit()]
-        step4 = step3[~step3['Name'].astype(str).str.contains('Hold for', na=False)]
-        step5 = step4[~step4['Name'].astype(str).str.contains('Min to', na=False)]
-        step6 = step5[~step5['Name'].astype(str).str.contains('TBD|TBA|Qualification|Threshold|Zone|Top', na=False, case=False)]
-        step7 = step6[~step6['Name'].astype(str).str.startswith(('Hold', 'Min', '#'), na=False)]
-        step8 = step7[~step7['Name'].apply(is_placeholder_athlete)]
-        
-        # DEBUG: Show filtering steps for Lead Semis
+        # Set expected athlete counts based on competition type
         if "Lead Semis" in competition_name:
-            st.write(f"🔍 After Name not null: {len(step1)}")
-            st.write(f"🔍 After Name not empty: {len(step2)}")
-            st.write(f"🔍 After removing digits: {len(step3)}")
-            st.write(f"🔍 After removing 'Hold for': {len(step4)}")
-            st.write(f"🔍 After removing 'Min to': {len(step5)}")
-            st.write(f"🔍 After removing TBD/TBA/etc: {len(step6)}")
-            st.write(f"🔍 After removing Hold/Min/#: {len(step7)}")
-            st.write(f"🔍 After removing placeholders: {len(step8)}")
+            expected_max = 24
+        elif "Boulder Semis" in competition_name:
+            expected_max = 20
+        elif "Final" in competition_name:
+            expected_max = 8
+        else:
+            expected_max = 999
+        
+        # For Lead Semis, take the first 24 athletes regardless of rank validity
+        if "Lead Semis" in competition_name:
+            if len(active_df) >= 24:
+                # Take first 24 athletes
+                active_df = active_df.head(24)
+                logger.info(f"{competition_name}: Using first 24 athletes (found {len(active_df)})")
+            else:
+                logger.warning(f"{competition_name}: Only found {len(active_df)} athletes, expected 24")
+        
+        # For other competitions, use rank-based filtering if available and needed
+        elif expected_max < 999 and len(active_df) > expected_max and 'Current Rank' in active_df.columns:
+            active_df['temp_rank'] = pd.to_numeric(active_df['Current Rank'], errors='coerce')
+            
+            # Try rank-based filtering first
+            rank_filtered = active_df[
+                (active_df['temp_rank'].notna()) & 
+                (active_df['temp_rank'] >= 1) & 
+                (active_df['temp_rank'] <= expected_max)
+            ]
+            
+            # If rank filtering gives us the expected count, use it
+            if len(rank_filtered) == expected_max:
+                active_df = rank_filtered.drop('temp_rank', axis=1)
+            else:
+                # Otherwise, just take the first N athletes
+                active_df = active_df.drop('temp_rank', axis=1).head(expected_max)
+        
+        # For any other case where we have too many, just take the first N
+        elif expected_max < 999 and len(active_df) > expected_max:
+            active_df = active_df.head(expected_max)
+        
+        return active_df
+        
+    except Exception as e:
+        logger.error(f"Error filtering athletes: {e}")
+        # Fallback to basic filtering
+        fallback_df = df[
+            df['Name'].notna() & 
+            (df['Name'] != '') &
+            (~df['Name'].astype(str).str.contains('Hold for', na=False))
+        ]
+        
+        # Apply expected count to fallback too
+        if "Lead Semis" in competition_name:
+            fallback_df = fallback_df.head(24)
+        elif "Final" in competition_name:
+            fallback_df = fallback_df.head(8)
+            
+        return fallback_df
             
             # Show what was removed in the last step
             removed_in_step6 = step5[step5['Name'].astype(str).str.contains('TBD|TBA|Qualification|Threshold|Zone|Top', na=False, case=False)]
