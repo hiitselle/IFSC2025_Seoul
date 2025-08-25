@@ -1148,8 +1148,6 @@ def extract_qualification_info(df: pd.DataFrame) -> Dict[str, str]:
     return qualification_info
 
 
-# Replace your filter_active_athletes function with this fixed version:
-
 def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFrame:
     """Filter out reference rows to get only active athletes"""
     try:
