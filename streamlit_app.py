@@ -1109,7 +1109,6 @@ def create_strategy_display(row: pd.Series, boulder_info: Dict, competition_name
 
 
 # And update the create_athlete_card function to handle the impossible top 8 case:
-
 def create_athlete_card(position_emoji: str, athlete: str, total_score: any, 
                        boulder_info: Dict, strategy_display: str, card_class: str):
     """Create and display an athlete card"""
@@ -1117,12 +1116,16 @@ def create_athlete_card(position_emoji: str, athlete: str, total_score: any,
     boulder_display = boulder_info['boulder_display']
     worst_finish_display = boulder_info['worst_finish_display']
     
+    # DEBUG: Show what card_class is being determined
+    debug_info = f"DEBUG: {athlete} - card_class: '{card_class}', worst_finish: '{worst_finish_display}'"
+    
     # Check if strategy display indicates impossible Top 8
     if isinstance(strategy_display, tuple):
         strategy_display, override_class = strategy_display
         if override_class == "eliminated":
             card_class = "eliminated"
             position_emoji = "❌"
+            debug_info += " - OVERRIDDEN by strategy"
     
     # Create detail text based on completion status
     if completed_boulders == 4:
@@ -1135,7 +1138,8 @@ def create_athlete_card(position_emoji: str, athlete: str, total_score: any,
     st.markdown(f"""
     <div class="athlete-row {card_class}">
         <strong>{position_emoji} - {athlete}</strong><br>
-        <small>{detail_text}</small>{strategy_display}
+        <small>{detail_text}</small>{strategy_display}<br>
+        <small style="color: gray; font-size: 0.7rem;">{debug_info}</small>
     </div>
     """, unsafe_allow_html=True)
 
