@@ -1215,60 +1215,6 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
             fallback_df = fallback_df.head(8)
             
         return fallback_df
-            
-        
-        # Set expected athlete counts based on competition type
-        if "Lead Semis" in competition_name:
-            expected_max = 24
-        elif "Boulder Semis" in competition_name:
-            expected_max = 20
-        elif "Final" in competition_name:
-            expected_max = 8
-        else:
-            expected_max = 999
-        
-        # DEBUG: Show before rank filtering
-        if "Lead Semis" in competition_name:
-            st.write(f"🔍 Before rank filtering: {len(active_df)} athletes")
-            st.write("Remaining athlete names:")
-            for i, name in enumerate(active_df['Name']):
-                rank = active_df.iloc[i].get('Current Rank', 'N/A')
-                st.write(f"  {i+1}. '{name}' (Rank: {rank})")
-        
-        # Apply rank-based filtering if needed
-        if expected_max < 999 and len(active_df) > expected_max and 'Current Rank' in active_df.columns:
-            active_df['temp_rank'] = pd.to_numeric(active_df['Current Rank'], errors='coerce')
-            
-            # DEBUG: Show rank info
-            if "Lead Semis" in competition_name:
-                st.write(f"🔍 Rank column found. Valid ranks: {active_df['temp_rank'].notna().sum()}")
-                st.write("Rank distribution:")
-                for i, (name, rank) in enumerate(zip(active_df['Name'], active_df['temp_rank'])):
-                    st.write(f"  {name}: {rank}")
-            
-            rank_filtered = active_df[
-                (active_df['temp_rank'].notna()) & 
-                (active_df['temp_rank'] >= 1) & 
-                (active_df['temp_rank'] <= expected_max)
-            ]
-            
-            if "Lead Semis" in competition_name:
-                st.write(f"🔍 After rank filtering (1-{expected_max}): {len(rank_filtered)}")
-            
-            active_df = rank_filtered.drop('temp_rank', axis=1)
-        
-        # Final result
-        if "Lead Semis" in competition_name:
-            st.write(f"🔍 FINAL RESULT: {len(active_df)} athletes")
-            if len(active_df) != 24:
-                st.error(f"❌ Expected 24 athletes, got {len(active_df)}")
-        
-        return active_df
-        
-    except Exception as e:
-        logger.error(f"Error filtering athletes: {e}")
-        st.error(f"Error in filtering: {e}")
-        return df.head(24) if "Lead Semis" in competition_name else df
 
 
 def is_placeholder_athlete(name: str) -> bool:
