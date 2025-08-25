@@ -1262,27 +1262,58 @@ def display_lead_athletes(active_df: pd.DataFrame, qualification_info: Dict[str,
     except Exception as e:
         logger.warning(f"Could not sort by rank: {e}")
     
-return active_df
+    # Display athlete cards
+    for _, row in active_df.iterrows():
+        name = DataProcessor.clean_text(str(row.get('Name', 'Unknown')))
+        score = row.get('Manual Score', 'N/A')
+        rank = row.get('Current Rank', 'N/A')
+        status = DataProcessor.clean_text(str(row.get('Status', 'Unknown')))
+        worst_finish = row.get('Worst Finish', 'N/A')
         
-    except Exception as e:
-        logger.error(f"Error filtering athletes: {e}")
-        # Fallback to basic filtering
-        fallback_df = df[
-            df['Name'].notna() & 
-            (df['Name'] != '') &
-            (~df['Name'].astype(str).str.contains('Hold for', na=False))
-        ]
+        # Determine if athlete has a score
+        has_score = score not in ['N/A', '', None] and not pd.isna(score)
         
-        # Apply expected count to fallback too
-        if "Lead Semis" in competition_name:
-            fallback_df = fallback_df.head(24)
-        elif "Final" in competition_name:
-            fallback_df = fallback_df.head(8)
-            
-        return fallback_df
+        # Create threshold display for athletes without scores
+        threshold_display = create_threshold_display(has_score, qualification_info)
+        
+        # Determine card styling
+        card_class, status_emoji = determine_lead_athlete_status(status, has_score)
+        
+        # Set position emoji
+        position_emoji = get_lead_position_emoji(rank, has_score, card_class, status_emoji)
+        
+        # Format displays
+        score_display = score if has_score else "Awaiting Result"
+        worst_finish_display = format_worst_finish(worst_finish, has_score)
+        
+        # Create athlete card
+        st.markdown(f"""
+        <div class="athlete-row {card_class}">
+            <strong>{position_emoji} #{rank} - {name}</strong><br>
+            <small>Score: {score_display} | Status: {status}{worst_finish_display}</small>{threshold_display}
+        </div>
+        """, unsafe_allow_html=True)
 
 
-def is_placeholder_athlete(name: str) -> bool:
+def create_threshold_display(has_score: bool, qualification_info: Dict[str, str]) -> str:
+    """Create threshold display for athletes without scores"""
+    if has_score or not qualification_info:
+        return ""
+    
+    thresholds = []
+    for key, value in qualification_info.items():
+        if key == 'Hold for 1st':
+            thresholds.append(f'🥇 1st: {value}')
+        elif key == 'Hold for 2nd':
+            thresholds.append(f'🥈 2nd: {value}')
+        elif key == 'Hold for 3rd':
+            thresholds.append(f'🥉 3rd: {value}')
+        elif key in ['Hold to Qualify', 'Min to Qualify']:
+            thresholds.append(f'🎯 Target: {value}')
+    
+    if thresholds:
+        return f"<br><div class='targets'><strong>Targets:</strong> {' | '.join(thresholds)}</div>"
+    return ""
 
 
 def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, str]:
@@ -1334,4 +1365,3 @@ if __name__ == "__main__":
             st.code(f"Time: {datetime.now()}")
             import traceback
             st.code(traceback.format_exc())
-
