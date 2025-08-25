@@ -1222,26 +1222,6 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
             
         return fallback_df
             
-            # Show what was removed in the last step
-            removed_in_step6 = step5[step5['Name'].astype(str).str.contains('TBD|TBA|Qualification|Threshold|Zone|Top', na=False, case=False)]
-            if len(removed_in_step6) > 0:
-                st.write("❌ Removed in step 6 (TBD/TBA/etc):")
-                for name in removed_in_step6['Name']:
-                    st.write(f"  - '{name}'")
-                    
-            removed_in_step7 = step6[step6['Name'].astype(str).str.startswith(('Hold', 'Min', '#'), na=False)]
-            if len(removed_in_step7) > 0:
-                st.write("❌ Removed in step 7 (Hold/Min/#):")
-                for name in removed_in_step7['Name']:
-                    st.write(f"  - '{name}'")
-                    
-            removed_in_step8 = step7[step7['Name'].apply(is_placeholder_athlete)]
-            if len(removed_in_step8) > 0:
-                st.write("❌ Removed in step 8 (placeholders):")
-                for name in removed_in_step8['Name']:
-                    st.write(f"  - '{name}'")
-        
-        active_df = step8
         
         # Set expected athlete counts based on competition type
         if "Lead Semis" in competition_name:
