@@ -497,6 +497,27 @@ class MetricsCalculator:
         except Exception as e:
             logger.error(f"Error calculating boulder metrics: {e}")
             return {'total_athletes': 0, 'completed_problems': 0, 'avg_score': 0, 'leader': 'TBD'}
+
+    def test_css_classes():
+    """Test function to verify CSS classes work"""
+    st.markdown("### 🧪 CSS Test (Remove this after testing)")
+    
+    test_classes = [
+        ("qualified", "✅ Should be GREEN"),
+        ("podium-position", "🏆 Should be GREEN/GOLD"), 
+        ("podium-contention", "⚠️ Should be YELLOW"),
+        ("eliminated", "❌ Should be RED"),
+        ("no-podium", "❌ Should be RED"),
+        ("awaiting-result", "⏳ Should be GRAY")
+    ]
+    
+    for css_class, description in test_classes:
+        st.markdown(f"""
+        <div class="athlete-row {css_class}">
+            <strong>{description}</strong><br>
+            <small>Class: {css_class}</small>
+        </div>
+        """, unsafe_allow_html=True)
     
     @staticmethod
     def calculate_lead_metrics(df: pd.DataFrame) -> Dict[str, any]:
@@ -578,65 +599,7 @@ def display_enhanced_metrics(df: pd.DataFrame, competition_name: str):
             </div>
             ''', unsafe_allow_html=True)
 
-    def test_css_classes():
-    """Test function to verify CSS classes work - call this in your main function temporarily"""
-    st.markdown("### 🧪 CSS Test (Remove this after testing)")
-    
-    test_classes = [
-        ("qualified", "✅ Should be GREEN"),
-        ("podium-position", "🏆 Should be GREEN/GOLD"), 
-        ("podium-contention", "⚠️ Should be YELLOW"),
-        ("eliminated", "❌ Should be RED"),
-        ("no-podium", "❌ Should be RED"),
-        ("awaiting-result", "⏳ Should be GRAY")
-    ]
-    
-    for css_class, description in test_classes:
-        st.markdown(f"""
-        <div class="athlete-row {css_class}">
-            <strong>{description}</strong><br>
-            <small>Class: {css_class}</small>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    elif "Lead" in competition_name:
-        metrics = MetricsCalculator.calculate_lead_metrics(df)
-        
-        with col1:
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>👥 Athletes</h4>
-                <h2>{metrics["total_athletes"]}</h2>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        with col2:
-            completion_rate = (metrics["completed"] / max(metrics["total_athletes"], 1)) * 100
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>✅ Completed</h4>
-                <h2>{metrics["completed"]}</h2>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: {completion_rate}%"></div>
-                </div>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>📊 Avg Score</h4>
-                <h2>{metrics["avg_score"]:.1f}</h2>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        with col4:
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>🥇 Leader</h4>
-                <h2>{metrics["leader"][:15]}{"..." if len(metrics["leader"]) > 15 else ""}</h2>
-            </div>
-            ''', unsafe_allow_html=True)
+
 
 def main():
     """Enhanced main application function"""
@@ -658,7 +621,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    test_css_classes()  # TEMPORARY - Remove after testing
+   
     
     # Enhanced sidebar
     st.sidebar.title("🎯 Dashboard Controls")
