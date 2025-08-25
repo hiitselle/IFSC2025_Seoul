@@ -613,7 +613,7 @@ def main():
         <p style="margin: 0; opacity: 0.9;">Real-time climbing competition tracking</p>
     </div>
     """, unsafe_allow_html=True)
-
+    
     test_css_classes()
     
     # Enhanced sidebar
