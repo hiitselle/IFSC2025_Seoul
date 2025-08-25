@@ -541,6 +541,17 @@ class MetricsCalculator:
         except Exception as e:
             logger.error(f"Error calculating lead metrics: {e}")
             return {'total_athletes': 0, 'completed': 0, 'avg_score': 0, 'leader': 'TBD'}
+            
+def test_css_classes():
+    """Simple test"""
+    st.markdown("### CSS Test")
+    st.markdown('<div class="athlete-row qualified"><strong>GREEN TEST</strong><br><small>qualified class</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="athlete-row podium-position"><strong>GREEN TEST 2</strong><br><small>podium-position class</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="athlete-row podium-contention"><strong>YELLOW TEST</strong><br><small>podium-contention class</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="athlete-row eliminated"><strong>RED TEST</strong><br><small>eliminated class</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="athlete-row no-podium"><strong>RED TEST 2</strong><br><small>no-podium class</small></div>', unsafe_allow_html=True)
+    st.markdown('<div class="athlete-row awaiting-result"><strong>GRAY TEST</strong><br><small>awaiting-result class</small></div>', unsafe_allow_html=True)
+
 
 def display_enhanced_metrics(df: pd.DataFrame, competition_name: str):
     """Display enhanced metrics with progress indicators"""
@@ -925,6 +936,8 @@ def calculate_boulder_completion(row: pd.Series) -> Dict[str, any]:
     }
 
 
+# Replace your determine_athlete_status function with this version:
+
 def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str) -> Tuple[str, str]:
     """Determine athlete status and appropriate styling - FIXED"""
     try:
@@ -932,15 +945,25 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
         completed_boulders = boulder_info['completed_boulders']
         worst_finish_display = boulder_info['worst_finish_display']
         
+        # If no valid rank, return gray
+        if rank_num <= 0:
+            return "awaiting-result", "⏳"
+        
         # Simple logic that ALWAYS returns valid classes
         if "Boulder" in competition_name and "Semis" in competition_name:
-            if rank_num <= 8:
+            if completed_boulders < 4:
+                # Still competing - yellow for everyone
+                return "podium-contention", "⚠️"  # YELLOW
+            elif rank_num <= 8:
                 return "qualified", "✅"  # GREEN - top 8 qualify
             else:
                 return "eliminated", "❌"  # RED - below 8th
         
         elif "Boulder" in competition_name and "Final" in competition_name:
-            if rank_num <= 3:
+            if completed_boulders < 4:
+                # Still competing - yellow for everyone
+                return "podium-contention", "⚠️"  # YELLOW
+            elif rank_num <= 3:
                 return "podium-position", "🏆"  # GREEN - podium
             else:
                 return "no-podium", "❌"  # RED - no podium
