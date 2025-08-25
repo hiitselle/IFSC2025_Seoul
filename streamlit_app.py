@@ -958,7 +958,6 @@ def calculate_boulder_completion(row: pd.Series) -> Dict[str, any]:
 
 
 # Find the determine_athlete_status function and replace it with this improved version:
-        
 def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str) -> Tuple[str, str]:
     """Determine athlete status and appropriate styling"""
     card_class = ""
@@ -971,7 +970,7 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
         
         # Extract worst finish number if available
         worst_finish_num = None
-        if worst_finish_display:
+        if worst_finish_display and "Worst Finish: " in worst_finish_display:
             try:
                 worst_parts = worst_finish_display.split("Worst Finish: ")
                 if len(worst_parts) > 1:
@@ -984,9 +983,26 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
             if "Final" in competition_name:
                 card_class, position_emoji = determine_final_status(rank_num, worst_finish_num, completed_boulders)
             elif "Semis" in competition_name:
-                card_class, position_emoji = determine_semis_status(rank_num, worst_finish_num, completed_boulders)
+                # Boulder Semis specific logic
+                if "Boulder" in competition_name:
+                    if worst_finish_num and worst_finish_num > 8:
+                        card_class, position_emoji = "eliminated", "❌"
+                    elif worst_finish_num and worst_finish_num <= 8:
+                        card_class, position_emoji = "qualified", "✅"
+                    elif rank_num <= 8:
+                        card_class, position_emoji = "podium-contention", "⚠️"
+                    else:
+                        card_class, position_emoji = "eliminated", "❌"
+                else:
+                    card_class, position_emoji = determine_semis_status(rank_num, worst_finish_num, completed_boulders)
             else:
                 card_class, position_emoji = determine_general_status(rank_num)
+        else:
+            # Still competing
+            if rank_num <= 8:
+                card_class, position_emoji = "podium-contention", "⚠️"
+            else:
+                position_emoji = f"#{rank_num}"
         
         # Fallback for rank display
         if not position_emoji and rank_num > 0:
