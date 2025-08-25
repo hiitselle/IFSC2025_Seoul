@@ -85,41 +85,36 @@ st.markdown("""
         font-size: 0.85rem;
     }
     
-    /* Status-based styling */
-    .podium-position {
+    /* Status-based styling - FIXED */
+    .athlete-row.podium-position {
         background: linear-gradient(135deg, #d4edda, #c3e6cb) !important;
         border: 2px solid #28a745 !important;
         color: #155724 !important;
     }
     
-    .podium-position .targets {
-        background-color: rgba(40, 167, 69, 0.25) !important;
-        color: #155724 !important;
+    .athlete-row.qualified {
+        background: linear-gradient(135deg, #d4edda, #c3e6cb) !important;
         border: 2px solid #28a745 !important;
+        color: #155724 !important;
     }
     
-    .qualified {
-        background: linear-gradient(135deg, #d4edda, #c3e6cb);
-        border: 2px solid #28a745;
-        color: #155724;
+    .athlete-row.podium-contention {
+        background: linear-gradient(135deg, #fff3cd, #ffeaa7) !important;
+        border: 2px solid #ffc107 !important;
+        color: #856404 !important;
     }
     
-    .podium-contention {
-        background: linear-gradient(135deg, #fff3cd, #ffeaa7);
-        border: 2px solid #ffc107;
-        color: #856404;
+    .athlete-row.eliminated,
+    .athlete-row.no-podium {
+        background: linear-gradient(135deg, #f8d7da, #f1b0b7) !important;
+        border: 2px solid #dc3545 !important;
+        color: #721c24 !important;
     }
     
-    .eliminated, .no-podium {
-        background: linear-gradient(135deg, #f8d7da, #f1b0b7);
-        border: 2px solid #dc3545;
-        color: #721c24;
-    }
-    
-    .awaiting-result {
-        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-        border: 2px solid #6c757d;
-        color: #495057;
+    .athlete-row.awaiting-result {
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef) !important;
+        border: 2px solid #6c757d !important;
+        color: #495057 !important;
     }
     
     /* Enhanced metric cards */
@@ -460,8 +455,6 @@ class DataLoader:
 
 class MetricsCalculator:
     """Enhanced metrics calculation"""
-
-  
     
     @staticmethod
     def calculate_boulder_metrics(df: pd.DataFrame) -> Dict[str, any]:
@@ -499,7 +492,6 @@ class MetricsCalculator:
         except Exception as e:
             logger.error(f"Error calculating boulder metrics: {e}")
             return {'total_athletes': 0, 'completed_problems': 0, 'avg_score': 0, 'leader': 'TBD'}
-
     
     @staticmethod
     def calculate_lead_metrics(df: pd.DataFrame) -> Dict[str, any]:
@@ -541,17 +533,6 @@ class MetricsCalculator:
         except Exception as e:
             logger.error(f"Error calculating lead metrics: {e}")
             return {'total_athletes': 0, 'completed': 0, 'avg_score': 0, 'leader': 'TBD'}
-            
-def test_css_classes():
-    """Simple test"""
-    st.markdown("### CSS Test")
-    st.markdown('<div class="athlete-row qualified"><strong>GREEN TEST</strong><br><small>qualified class</small></div>', unsafe_allow_html=True)
-    st.markdown('<div class="athlete-row podium-position"><strong>GREEN TEST 2</strong><br><small>podium-position class</small></div>', unsafe_allow_html=True)
-    st.markdown('<div class="athlete-row podium-contention"><strong>YELLOW TEST</strong><br><small>podium-contention class</small></div>', unsafe_allow_html=True)
-    st.markdown('<div class="athlete-row eliminated"><strong>RED TEST</strong><br><small>eliminated class</small></div>', unsafe_allow_html=True)
-    st.markdown('<div class="athlete-row no-podium"><strong>RED TEST 2</strong><br><small>no-podium class</small></div>', unsafe_allow_html=True)
-    st.markdown('<div class="athlete-row awaiting-result"><strong>GRAY TEST</strong><br><small>awaiting-result class</small></div>', unsafe_allow_html=True)
-
 
 def display_enhanced_metrics(df: pd.DataFrame, competition_name: str):
     """Display enhanced metrics with progress indicators"""
@@ -591,8 +572,108 @@ def display_enhanced_metrics(df: pd.DataFrame, competition_name: str):
                 <h2>{metrics["leader"][:15]}{"..." if len(metrics["leader"]) > 15 else ""}</h2>
             </div>
             ''', unsafe_allow_html=True)
+    
+    elif "Lead" in competition_name:
+        metrics = MetricsCalculator.calculate_lead_metrics(df)
+        
+        with col1:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>👥 Athletes</h4>
+                <h2>{metrics["total_athletes"]}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col2:
+            completion_rate = (metrics["completed"] / max(metrics["total_athletes"], 1)) * 100
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>✅ Completed</h4>
+                <h2>{metrics["completed"]}</h2>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {completion_rate}%"></div>
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>📊 Avg Score</h4>
+                <h2>{metrics["avg_score"]:.1f}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col4:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>🥇 Leader</h4>
+                <h2>{metrics["leader"][:15]}{"..." if len(metrics["leader"]) > 15 else ""}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
 
+def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str) -> Tuple[str, str]:
+    """Determine athlete status and appropriate styling - FIXED"""
+    try:
+        rank_num = DataProcessor.safe_numeric_conversion(rank)
+        completed_boulders = boulder_info['completed_boulders']
+        worst_finish_display = boulder_info['worst_finish_display']
+        
+        # If no valid rank, return gray
+        if rank_num <= 0:
+            return "awaiting-result", "⏳"
+        
+        # FIXED LOGIC - Always returns valid CSS classes
+        if "Boulder" in competition_name and "Semis" in competition_name:
+            if completed_boulders < 4:
+                # Still competing - yellow for everyone
+                return "podium-contention", "⚠️"
+            elif rank_num <= 8:
+                return "qualified", "✅"  # GREEN
+            else:
+                return "eliminated", "❌"  # RED
+        
+        elif "Boulder" in competition_name and "Final" in competition_name:
+            if completed_boulders < 4:
+                # Still competing - yellow for everyone
+                return "podium-contention", "⚠️"
+            elif rank_num <= 3:
+                return "podium-position", "🏆"  # GREEN
+            else:
+                return "no-podium", "❌"  # RED
+        
+        # Default for all other cases
+        else:
+            if rank_num <= 3:
+                return "podium-position", "🏆"  # GREEN
+            elif rank_num <= 8:
+                return "qualified", "✅"  # GREEN
+            else:
+                return "eliminated", "❌"  # RED
+            
+    except Exception as e:
+        logger.warning(f"Error: {e}")
+        return "awaiting-result", "⏳"
 
+def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, str]:
+    """Determine lead athlete status - FIXED"""
+    if not has_score:
+        return "awaiting-result", "📄"
+    
+    status_lower = str(status).lower()
+    
+    if "qualified" in status_lower:
+        return "qualified", "✅"
+    elif "eliminated" in status_lower:
+        return "eliminated", "❌"
+    elif "podium" in status_lower and "no podium" not in status_lower:
+        return "podium-position", "🏆"
+    elif "contention" in status_lower:
+        return "podium-contention", "⚠️"
+    elif "no podium" in status_lower:
+        return "no-podium", "❌"
+    else:
+        return "podium-contention", "📊"
 
 def main():
     """Enhanced main application function"""
@@ -613,15 +694,6 @@ def main():
         <p style="margin: 0; opacity: 0.9;">Real-time climbing competition tracking</p>
     </div>
     """, unsafe_allow_html=True)
-
-    st.error("🔥 DEBUG: I AM RIGHT AFTER THE HEADER!")  # ADD THIS LINE
-    
-    test_css_classes()
-    
-    st.write("HELLO WORLD - IF YOU SEE THIS, STREAMLIT IS WORKING")
-    
-    test_css_classes()
-    st.write("HELLO WORLD - IF YOU SEE THIS, STREAMLIT IS WORKING")
     
     # Enhanced sidebar
     st.sidebar.title("🎯 Dashboard Controls")
@@ -943,116 +1015,6 @@ def calculate_boulder_completion(row: pd.Series) -> Dict[str, any]:
     }
 
 
-# Replace your determine_athlete_status function with this version:
-
-def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str) -> Tuple[str, str]:
-    """Determine athlete status and appropriate styling - FIXED"""
-    try:
-        rank_num = DataProcessor.safe_numeric_conversion(rank)
-        completed_boulders = boulder_info['completed_boulders']
-        worst_finish_display = boulder_info['worst_finish_display']
-        
-        # If no valid rank, return gray
-        if rank_num <= 0:
-            return "awaiting-result", "⏳"
-        
-        # Simple logic that ALWAYS returns valid classes
-        if "Boulder" in competition_name and "Semis" in competition_name:
-            if completed_boulders < 4:
-                # Still competing - yellow for everyone
-                return "podium-contention", "⚠️"  # YELLOW
-            elif rank_num <= 8:
-                return "qualified", "✅"  # GREEN - top 8 qualify
-            else:
-                return "eliminated", "❌"  # RED - below 8th
-        
-        elif "Boulder" in competition_name and "Final" in competition_name:
-            if completed_boulders < 4:
-                # Still competing - yellow for everyone
-                return "podium-contention", "⚠️"  # YELLOW
-            elif rank_num <= 3:
-                return "podium-position", "🏆"  # GREEN - podium
-            else:
-                return "no-podium", "❌"  # RED - no podium
-        
-        # Default for all other cases
-        else:
-            if rank_num <= 3:
-                return "podium-position", "🏆"  # GREEN
-            elif rank_num <= 8:
-                return "qualified", "✅"  # GREEN
-            else:
-                return "eliminated", "❌"  # RED
-            
-    except Exception as e:
-        logger.warning(f"Error: {e}")
-        return "awaiting-result", "⏳"  # GRAY fallback
-
-
-def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, str]:
-    """Determine lead athlete status - FIXED"""
-    if not has_score:
-        return "awaiting-result", "📄"  # GRAY
-    
-    # Simple text matching
-    status_lower = str(status).lower()
-    
-    if "qualified" in status_lower:
-        return "qualified", "✅"  # GREEN
-    elif "eliminated" in status_lower:
-        return "eliminated", "❌"  # RED
-    elif "podium" in status_lower and "no podium" not in status_lower:
-        return "podium-position", "🏆"  # GREEN
-    elif "contention" in status_lower:
-        return "podium-contention", "⚠️"  # YELLOW
-    elif "no podium" in status_lower:
-        return "no-podium", "❌"  # RED
-    else:
-        # Default to yellow if unclear
-        return "podium-contention", "📊"  # YELLOW
-
-def determine_semis_status(rank_num: float, worst_finish_num: Optional[float], completed_boulders: int) -> Tuple[str, str]:
-    """Determine status for semifinals"""
-    # If worst finish is > 8, they're eliminated (can't make top 8)
-    if worst_finish_num and worst_finish_num > 8:
-        return "eliminated", "❌"
-    # If worst finish is <= 8, they're qualified/safe for top 8
-    elif worst_finish_num and worst_finish_num <= 8:
-        return "qualified", "✅"
-    # If current rank is <= 8 or they haven't finished all boulders (still have a chance)
-    elif rank_num <= 8 or completed_boulders < 4:
-        return "podium-contention", "⚠️"
-    # If current rank is > 8 and they've completed all boulders (but no worst finish data)
-    else:
-        return "eliminated", "❌"
-
-
-def determine_final_status(rank_num: float, worst_finish_num: Optional[float], completed_boulders: int) -> Tuple[str, str]:
-    """Determine status for final competitions"""
-    if worst_finish_num and worst_finish_num <= 3:
-        return "podium-position", "🏆"
-    elif rank_num <= 3 and completed_boulders < 4:
-        return "podium-contention", "⚠️"
-    elif rank_num > 3:
-        if completed_boulders < 4:
-            return "podium-contention", "⚠️"
-        else:
-            return "no-podium", "❌"
-    else:
-        return "podium-contention", "⚠️"
-
-
-def determine_general_status(rank_num: float) -> Tuple[str, str]:
-    """Determine status for general competitions"""
-    if rank_num <= 3:
-        emoji = "🥇" if rank_num == 1 else "🥈" if rank_num == 2 else "🥉"
-        return "podium-position", emoji
-    elif rank_num <= 8:
-        return "qualified", "✅"
-    else:
-        return "eliminated", "❌"
-# Also replace the create_strategy_display function with this improved version:
-
 def create_strategy_display(row: pd.Series, boulder_info: Dict, competition_name: str) -> str:
     """Create strategy display for boulder competitions"""
     strategy_display = ""
@@ -1088,7 +1050,6 @@ def create_strategy_display(row: pd.Series, boulder_info: Dict, competition_name
                             strategies.append(f"🥉 3rd: {strategy_clean}")
                         elif place == 'top8' and "Semis" in competition_name:
                             strategies.append(f"🎯 Top 8: {strategy_clean}")
-                            # Check if Top 8 is impossible
                             if "IMPOSSIBLE" in strategy_clean.upper():
                                 has_impossible_top8 = True
             
@@ -1096,24 +1057,22 @@ def create_strategy_display(row: pd.Series, boulder_info: Dict, competition_name
                 comp_type = "Final" if "Final" in competition_name else "Semi"
                 strategy_display = f"<br><div class='targets'><strong>{comp_type} Strategy:</strong> {' | '.join(strategies)}</div>"
                 
-                # If Top 8 is impossible in semis, return elimination status
                 if has_impossible_top8 and "Semis" in competition_name:
                     return strategy_display, "eliminated"
     
     return strategy_display
 
 
-# And update the create_athlete_card function to handle the impossible top 8 case:
 def create_athlete_card(position_emoji: str, athlete: str, total_score: any, 
                        boulder_info: Dict, strategy_display: str, card_class: str):
-    """Create and display an athlete card with guaranteed styling"""
+    """Create and display an athlete card"""
     completed_boulders = boulder_info['completed_boulders']
     boulder_display = boulder_info['boulder_display']
     worst_finish_display = boulder_info['worst_finish_display']
     
     # Ensure card_class is never empty
     if not card_class or card_class.strip() == "":
-        card_class = "awaiting-result"  # Default to gray if no class
+        card_class = "awaiting-result"
     
     # Check if strategy display indicates impossible Top 8
     if isinstance(strategy_display, tuple):
@@ -1130,16 +1089,13 @@ def create_athlete_card(position_emoji: str, athlete: str, total_score: any,
     else:
         detail_text = f"Total: {total_score} | {boulder_display} | Progress: {completed_boulders}/4"
     
-    # Debug info to see what's happening (remove this in production)
-    debug_info = f"Class: {card_class}"
-    
     st.markdown(f"""
     <div class="athlete-row {card_class}">
         <strong>{position_emoji} - {athlete}</strong><br>
-        <small>{detail_text}</small>{strategy_display}<br>
-        <small style="color: gray; font-size: 0.7rem;">{debug_info}</small>
+        <small>{detail_text}</small>{strategy_display}
     </div>
     """, unsafe_allow_html=True)
+
 
 def display_lead_results(df: pd.DataFrame, competition_name: str):
     """Enhanced lead competition results display"""
@@ -1190,6 +1146,7 @@ def extract_qualification_info(df: pd.DataFrame) -> Dict[str, str]:
         logger.warning(f"Error extracting qualification thresholds: {e}")
     return qualification_info
 
+
 def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFrame:
     """Filter out reference rows to get only active athletes"""
     try:
@@ -1214,7 +1171,6 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
         else:
             expected_max = 999
         
-        # For Lead Semis, take the first 24 athletes regardless of rank validity
         if "Lead Semis" in competition_name:
             if len(active_df) >= 24:
                 active_df = active_df.head(24)
@@ -1222,7 +1178,6 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
             else:
                 logger.warning(f"{competition_name}: Only found {len(active_df)} athletes, expected 24")
         
-        # For other competitions, use rank-based filtering if available and needed
         elif expected_max < 999 and len(active_df) > expected_max and 'Current Rank' in active_df.columns:
             active_df['temp_rank'] = pd.to_numeric(active_df['Current Rank'], errors='coerce')
             
@@ -1244,14 +1199,12 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
         
     except Exception as e:
         logger.error(f"Error filtering athletes: {e}")
-        # Fallback to basic filtering
         fallback_df = df[
             df['Name'].notna() & 
             (df['Name'] != '') &
             (~df['Name'].astype(str).str.contains('Hold for', na=False))
         ]
         
-        # Apply expected count to fallback too
         if "Lead Semis" in competition_name:
             fallback_df = fallback_df.head(24)
         elif "Final" in competition_name:
@@ -1297,7 +1250,6 @@ def display_qualification_thresholds(qualification_info: Dict[str, str]):
 
 def display_lead_athletes(active_df: pd.DataFrame, qualification_info: Dict[str, str]):
     """Display lead competition athletes with enhanced formatting"""
-    # Sort by rank if available
     try:
         if 'Current Rank' in active_df.columns:
             active_df['Current Rank'] = pd.to_numeric(active_df['Current Rank'], errors='coerce')
@@ -1305,31 +1257,24 @@ def display_lead_athletes(active_df: pd.DataFrame, qualification_info: Dict[str,
     except Exception as e:
         logger.warning(f"Could not sort by rank: {e}")
     
-    # Display athlete cards
     for _, row in active_df.iterrows():
         name = DataProcessor.clean_text(str(row.get('Name', 'Unknown')))
         score = row.get('Manual Score', 'N/A')
         rank = row.get('Current Rank', 'N/A')
-        status = str(row.get('Status', 'Unknown')).replace('à', '').replace('â', '').replace('á', '').replace('ä', '').replace('ã', '').replace('å', '').replace('aa', 'a').replace('  ', ' ').strip()
+        status = DataProcessor.clean_text(str(row.get('Status', 'Unknown')))
         worst_finish = row.get('Worst Finish', 'N/A')
         
-        # Determine if athlete has a score
         has_score = score not in ['N/A', '', None] and not pd.isna(score)
         
-        # Create threshold display for athletes without scores
         threshold_display = create_threshold_display(has_score, qualification_info)
         
-        # Determine card styling
         card_class, status_emoji = determine_lead_athlete_status(status, has_score)
         
-        # Set position emoji
         position_emoji = get_lead_position_emoji(rank, has_score, card_class, status_emoji)
         
-        # Format displays
         score_display = score if has_score else "Awaiting Result"
         worst_finish_display = format_worst_finish(worst_finish, has_score)
         
-        # Create athlete card
         st.markdown(f"""
         <div class="athlete-row {card_class}">
             <strong>{position_emoji} #{rank} - {name}</strong><br>
@@ -1337,8 +1282,6 @@ def display_lead_athletes(active_df: pd.DataFrame, qualification_info: Dict[str,
         </div>
         """, unsafe_allow_html=True)
 
-
-# Replace the create_threshold_display function with this improved version:
 
 def create_threshold_display(has_score: bool, qualification_info: Dict[str, str]) -> str:
     """Create threshold display for athletes without scores"""
@@ -1361,8 +1304,6 @@ def create_threshold_display(has_score: bool, qualification_info: Dict[str, str]
     if thresholds:
         return f"<br><div class='targets'><strong>Targets:</strong><br>{' | '.join(thresholds)}</div>"
     return ""
-
-
 
 
 def get_lead_position_emoji(rank: any, has_score: bool, card_class: str, status_emoji: str) -> str:
