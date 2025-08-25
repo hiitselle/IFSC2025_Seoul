@@ -615,6 +615,7 @@ def main():
     """, unsafe_allow_html=True)
     
     test_css_classes()
+    st.write("HELLO WORLD - IF YOU SEE THIS, STREAMLIT IS WORKING")
     
     # Enhanced sidebar
     st.sidebar.title("🎯 Dashboard Controls")
