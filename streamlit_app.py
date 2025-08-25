@@ -1166,7 +1166,7 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
         if "Lead Semis" in competition_name:
             expected_max = 24
         elif "Boulder Semis" in competition_name:
-            expected_max = 20
+            expected_max = 24
         elif "Final" in competition_name:
             expected_max = 8
         else:
