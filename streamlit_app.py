@@ -1296,6 +1296,8 @@ def display_lead_athletes(active_df: pd.DataFrame, qualification_info: Dict[str,
         """, unsafe_allow_html=True)
 
 
+# Replace the create_threshold_display function with this improved version:
+
 def create_threshold_display(has_score: bool, qualification_info: Dict[str, str]) -> str:
     """Create threshold display for athletes without scores"""
     if has_score or not qualification_info:
@@ -1304,16 +1306,18 @@ def create_threshold_display(has_score: bool, qualification_info: Dict[str, str]
     thresholds = []
     for key, value in qualification_info.items():
         if key == 'Hold for 1st':
-            thresholds.append(f'🥇 1st: {value}')
+            thresholds.append(f'🥇 For 1st Hold: {value}')
         elif key == 'Hold for 2nd':
-            thresholds.append(f'🥈 2nd: {value}')
+            thresholds.append(f'🥈 For 2nd Hold: {value}')
         elif key == 'Hold for 3rd':
-            thresholds.append(f'🥉 3rd: {value}')
-        elif key in ['Hold to Qualify', 'Min to Qualify']:
-            thresholds.append(f'🎯 Target: {value}')
+            thresholds.append(f'🥉 For 3rd Hold: {value}')
+        elif key == 'Hold to Qualify':
+            thresholds.append(f'🎯 Target Hold: {value}')
+        elif key == 'Min to Qualify':
+            thresholds.append(f'📊 Final Target Points: {value}')
     
     if thresholds:
-        return f"<br><div class='targets'><strong>Targets:</strong> {' | '.join(thresholds)}</div>"
+        return f"<br><div class='targets'><strong>Targets:</strong><br>{' | '.join(thresholds)}</div>"
     return ""
 
 
