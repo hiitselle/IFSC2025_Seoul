@@ -1148,48 +1148,114 @@ def extract_qualification_info(df: pd.DataFrame) -> Dict[str, str]:
     return qualification_info
 
 
+# Add this debugging version of the filter_active_athletes function
+# Replace your current filter_active_athletes function with this one temporarily:
+
 def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFrame:
     """Filter out reference rows to get only active athletes"""
     try:
-        active_df = df[
-            df['Name'].notna() & 
-            (df['Name'] != '') & 
-            (~df['Name'].astype(str).str.isdigit()) &
-            (~df['Name'].astype(str).str.contains('Hold for', na=False)) &
-            (~df['Name'].astype(str).str.contains('Min to', na=False)) &
-            (~df['Name'].astype(str).str.contains('TBD|TBA|Qualification|Threshold|Zone|Top', na=False, case=False)) &
-            (~df['Name'].astype(str).str.startswith(('Hold', 'Min', '#'), na=False)) &
-            (~df['Name'].apply(is_placeholder_athlete))
-        ]
+        # DEBUG: Log initial data
+        if "Lead Semis" in competition_name:
+            st.write(f"🔍 DEBUG: Initial dataframe has {len(df)} rows")
+            st.write("First 10 names:")
+            if 'Name' in df.columns:
+                for i, name in enumerate(df['Name'].head(10)):
+                    st.write(f"  {i+1}. '{name}'")
         
-      # Set expected athlete counts based on competition type
+        # Apply all filters step by step with debugging
+        step1 = df[df['Name'].notna()]
+        step2 = step1[step1['Name'] != '']
+        step3 = step2[~step2['Name'].astype(str).str.isdigit()]
+        step4 = step3[~step3['Name'].astype(str).str.contains('Hold for', na=False)]
+        step5 = step4[~step4['Name'].astype(str).str.contains('Min to', na=False)]
+        step6 = step5[~step5['Name'].astype(str).str.contains('TBD|TBA|Qualification|Threshold|Zone|Top', na=False, case=False)]
+        step7 = step6[~step6['Name'].astype(str).str.startswith(('Hold', 'Min', '#'), na=False)]
+        step8 = step7[~step7['Name'].apply(is_placeholder_athlete)]
+        
+        # DEBUG: Show filtering steps for Lead Semis
+        if "Lead Semis" in competition_name:
+            st.write(f"🔍 After Name not null: {len(step1)}")
+            st.write(f"🔍 After Name not empty: {len(step2)}")
+            st.write(f"🔍 After removing digits: {len(step3)}")
+            st.write(f"🔍 After removing 'Hold for': {len(step4)}")
+            st.write(f"🔍 After removing 'Min to': {len(step5)}")
+            st.write(f"🔍 After removing TBD/TBA/etc: {len(step6)}")
+            st.write(f"🔍 After removing Hold/Min/#: {len(step7)}")
+            st.write(f"🔍 After removing placeholders: {len(step8)}")
+            
+            # Show what was removed in the last step
+            removed_in_step6 = step5[step5['Name'].astype(str).str.contains('TBD|TBA|Qualification|Threshold|Zone|Top', na=False, case=False)]
+            if len(removed_in_step6) > 0:
+                st.write("❌ Removed in step 6 (TBD/TBA/etc):")
+                for name in removed_in_step6['Name']:
+                    st.write(f"  - '{name}'")
+                    
+            removed_in_step7 = step6[step6['Name'].astype(str).str.startswith(('Hold', 'Min', '#'), na=False)]
+            if len(removed_in_step7) > 0:
+                st.write("❌ Removed in step 7 (Hold/Min/#):")
+                for name in removed_in_step7['Name']:
+                    st.write(f"  - '{name}'")
+                    
+            removed_in_step8 = step7[step7['Name'].apply(is_placeholder_athlete)]
+            if len(removed_in_step8) > 0:
+                st.write("❌ Removed in step 8 (placeholders):")
+                for name in removed_in_step8['Name']:
+                    st.write(f"  - '{name}'")
+        
+        active_df = step8
+        
+        # Set expected athlete counts based on competition type
         if "Lead Semis" in competition_name:
             expected_max = 24
         elif "Boulder Semis" in competition_name:
-            expected_max = 24
+            expected_max = 20
         elif "Final" in competition_name:
             expected_max = 8
         else:
             expected_max = 999
-        if len(active_df) > expected_max and 'Current Rank' in active_df.columns:
+        
+        # DEBUG: Show before rank filtering
+        if "Lead Semis" in competition_name:
+            st.write(f"🔍 Before rank filtering: {len(active_df)} athletes")
+            st.write("Remaining athlete names:")
+            for i, name in enumerate(active_df['Name']):
+                rank = active_df.iloc[i].get('Current Rank', 'N/A')
+                st.write(f"  {i+1}. '{name}' (Rank: {rank})")
+        
+        # Apply rank-based filtering if needed
+        if expected_max < 999 and len(active_df) > expected_max and 'Current Rank' in active_df.columns:
             active_df['temp_rank'] = pd.to_numeric(active_df['Current Rank'], errors='coerce')
-            active_df = active_df[
+            
+            # DEBUG: Show rank info
+            if "Lead Semis" in competition_name:
+                st.write(f"🔍 Rank column found. Valid ranks: {active_df['temp_rank'].notna().sum()}")
+                st.write("Rank distribution:")
+                for i, (name, rank) in enumerate(zip(active_df['Name'], active_df['temp_rank'])):
+                    st.write(f"  {name}: {rank}")
+            
+            rank_filtered = active_df[
                 (active_df['temp_rank'].notna()) & 
                 (active_df['temp_rank'] >= 1) & 
                 (active_df['temp_rank'] <= expected_max)
             ]
-            active_df = active_df.drop('temp_rank', axis=1)
+            
+            if "Lead Semis" in competition_name:
+                st.write(f"🔍 After rank filtering (1-{expected_max}): {len(rank_filtered)}")
+            
+            active_df = rank_filtered.drop('temp_rank', axis=1)
+        
+        # Final result
+        if "Lead Semis" in competition_name:
+            st.write(f"🔍 FINAL RESULT: {len(active_df)} athletes")
+            if len(active_df) != 24:
+                st.error(f"❌ Expected 24 athletes, got {len(active_df)}")
         
         return active_df
         
     except Exception as e:
         logger.error(f"Error filtering athletes: {e}")
-        # Fallback to basic filtering
-        return df[
-            df['Name'].notna() & 
-            (df['Name'] != '') &
-            (~df['Name'].astype(str).str.contains('Hold for', na=False))
-        ]
+        st.error(f"Error in filtering: {e}")
+        return df.head(24) if "Lead Semis" in competition_name else df
 
 
 def is_placeholder_athlete(name: str) -> bool:
