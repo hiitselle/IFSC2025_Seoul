@@ -500,26 +500,6 @@ class MetricsCalculator:
             logger.error(f"Error calculating boulder metrics: {e}")
             return {'total_athletes': 0, 'completed_problems': 0, 'avg_score': 0, 'leader': 'TBD'}
 
-def test_css_classes():
-    """Test function to verify CSS classes work"""
-    st.markdown("### 🧪 CSS Test (Remove this after testing)")
-    
-    test_classes = [
-        ("qualified", "✅ Should be GREEN"),
-        ("podium-position", "🏆 Should be GREEN/GOLD"), 
-        ("podium-contention", "⚠️ Should be YELLOW"),
-        ("eliminated", "❌ Should be RED"),
-        ("no-podium", "❌ Should be RED"),
-        ("awaiting-result", "⏳ Should be GRAY")
-    ]
-    
-    for css_class, description in test_classes:
-        st.markdown(f"""
-        <div class="athlete-row {css_class}">
-            <strong>{description}</strong><br>
-            <small>Class: {css_class}</small>
-        </div>
-        """, unsafe_allow_html=True)
     
     @staticmethod
     def calculate_lead_metrics(df: pd.DataFrame) -> Dict[str, any]:
@@ -945,131 +925,60 @@ def calculate_boulder_completion(row: pd.Series) -> Dict[str, any]:
     }
 
 
-# Find the determine_athlete_status function and replace it with this improved version:
-# Replace the determine_athlete_status function with this improved version:
-
 def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str) -> Tuple[str, str]:
-    """Determine athlete status and appropriate styling"""
+    """Determine athlete status and appropriate styling - FIXED"""
     try:
         rank_num = DataProcessor.safe_numeric_conversion(rank)
         completed_boulders = boulder_info['completed_boulders']
         worst_finish_display = boulder_info['worst_finish_display']
         
-        # Extract worst finish number if available
-        worst_finish_num = None
-        if worst_finish_display and "Worst Finish: " in worst_finish_display:
-            try:
-                worst_finish_str = worst_finish_display.split("Worst Finish: ")[1].strip()
-                worst_finish_num = float(worst_finish_str)
-            except:
-                pass
-        
-        # FOR BOULDER SEMIS - Clear logic with proper fallbacks
+        # Simple logic that ALWAYS returns valid classes
         if "Boulder" in competition_name and "Semis" in competition_name:
-            if completed_boulders == 4:  # Finished all boulders
-                if worst_finish_num is not None:
-                    if worst_finish_num <= 8:
-                        return "qualified", "✅"  # Safe for top 8 (GREEN)
-                    else:
-                        return "eliminated", "❌"  # Can't make top 8 (RED)
-                else:
-                    # Use current rank as fallback
-                    if rank_num > 0 and rank_num <= 8:
-                        return "qualified", "✅"  # GREEN
-                    elif rank_num > 8:
-                        return "eliminated", "❌"  # RED
-                    else:
-                        return "awaiting-result", "⏳"  # GRAY
+            if rank_num <= 8:
+                return "qualified", "✅"  # GREEN - top 8 qualify
             else:
-                # Still competing - use current rank to show contention
-                if rank_num > 0 and rank_num <= 8:
-                    return "podium-contention", "⚠️"  # YELLOW
-                elif rank_num > 8:
-                    return "podium-contention", "⏰"  # YELLOW (still has chance)
-                else:
-                    return "awaiting-result", "⏳"  # GRAY
+                return "eliminated", "❌"  # RED - below 8th
         
-        # FOR BOULDER FINALS - Clear logic
         elif "Boulder" in competition_name and "Final" in competition_name:
-            if completed_boulders == 4:  # Finished all boulders
-                if worst_finish_num is not None:
-                    if worst_finish_num <= 3:
-                        return "podium-position", "🏆"  # GOLD/GREEN
-                    else:
-                        return "no-podium", "❌"  # RED
-                else:
-                    # Use current rank
-                    if rank_num > 0 and rank_num <= 3:
-                        return "podium-position", "🏆"  # GREEN
-                    elif rank_num > 3:
-                        return "no-podium", "❌"  # RED
-                    else:
-                        return "awaiting-result", "⏳"  # GRAY
+            if rank_num <= 3:
+                return "podium-position", "🏆"  # GREEN - podium
             else:
-                # Still competing in final
-                if rank_num > 0 and rank_num <= 3:
-                    return "podium-contention", "⚠️"  # YELLOW
-                elif rank_num > 3:
-                    return "podium-contention", "💪"  # YELLOW (fighting for podium)
-                else:
-                    return "awaiting-result", "⏳"  # GRAY
+                return "no-podium", "❌"  # RED - no podium
         
-        # FOR OTHER BOULDER COMPETITIONS - Basic logic with fallbacks
+        # Default for all other cases
         else:
-            if rank_num > 0:
-                if rank_num <= 3:
-                    emoji = "🥇" if rank_num == 1 else "🥈" if rank_num == 2 else "🥉"
-                    return "podium-position", emoji  # GREEN
-                elif rank_num <= 8:
-                    return "qualified", "✅"  # GREEN
-                else:
-                    return "eliminated", "❌"  # RED
+            if rank_num <= 3:
+                return "podium-position", "🏆"  # GREEN
+            elif rank_num <= 8:
+                return "qualified", "✅"  # GREEN
             else:
-                return "awaiting-result", "⏳"  # GRAY
+                return "eliminated", "❌"  # RED
             
     except Exception as e:
-        logger.warning(f"Error determining athlete status: {e}")
-        # Always return a valid fallback
-        rank_num = DataProcessor.safe_numeric_conversion(rank, default=999)
-        if rank_num <= 8:
-            return "podium-contention", f"#{int(rank_num)}"  # YELLOW
-        else:
-            return "awaiting-result", f"#{int(rank_num)}"  # GRAY
+        logger.warning(f"Error: {e}")
+        return "awaiting-result", "⏳"  # GRAY fallback
 
-
-# Also replace the determine_lead_athlete_status function:
 
 def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, str]:
-    """Determine lead athlete status and styling - always returns a valid class"""
+    """Determine lead athlete status - FIXED"""
     if not has_score:
         return "awaiting-result", "📄"  # GRAY
     
-    status_lower = status.lower() if status else ""
+    # Simple text matching
+    status_lower = str(status).lower()
     
-    # Check for qualified/safe status
-    if "qualified" in status_lower or "✓✓" in status or "safe" in status_lower:
+    if "qualified" in status_lower:
         return "qualified", "✅"  # GREEN
-    
-    # Check for elimination
-    elif "eliminated" in status_lower or "✗" in status or "out" in status_lower:
+    elif "eliminated" in status_lower:
         return "eliminated", "❌"  # RED
-    
-    # Check for podium position
-    elif ("podium" in status_lower and "no podium" not in status_lower and 
-          "contention" not in status_lower):
-        return "podium-position", "🏆"  # GREEN/GOLD
-    
-    # Check for podium contention
-    elif ("podium contention" in status_lower or "contention" in status_lower or
-          "fighting" in status_lower):
+    elif "podium" in status_lower and "no podium" not in status_lower:
+        return "podium-position", "🏆"  # GREEN
+    elif "contention" in status_lower:
         return "podium-contention", "⚠️"  # YELLOW
-    
-    # Check for no podium
     elif "no podium" in status_lower:
         return "no-podium", "❌"  # RED
-    
-    # Default case - if has score but status unclear, assume contention
     else:
+        # Default to yellow if unclear
         return "podium-contention", "📊"  # YELLOW
 
 def determine_semis_status(rank_num: float, worst_finish_num: Optional[float], completed_boulders: int) -> Tuple[str, str]:
