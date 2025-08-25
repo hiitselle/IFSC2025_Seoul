@@ -957,6 +957,8 @@ def calculate_boulder_completion(row: pd.Series) -> Dict[str, any]:
     }
 
 
+# Find the determine_athlete_status function and replace it with this improved version:
+
 def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str) -> Tuple[str, str]:
     """Determine athlete status and appropriate styling"""
     card_class = ""
@@ -999,41 +1001,7 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
     return card_class, position_emoji
 
 
-def determine_final_status(rank_num: float, worst_finish_num: Optional[float], completed_boulders: int) -> Tuple[str, str]:
-    """Determine status for final competitions"""
-    if worst_finish_num and worst_finish_num <= 3:
-        return "podium-position", "🏆"
-    elif rank_num <= 3 and completed_boulders < 4:
-        return "podium-contention", "⚠️"
-    elif rank_num > 3:
-        if completed_boulders < 4:
-            return "podium-contention", "⚠️"
-        else:
-            return "no-podium", "❌"
-    else:
-        return "podium-contention", "⚠️"
-
-
-def determine_semis_status(rank_num: float, worst_finish_num: Optional[float], completed_boulders: int) -> Tuple[str, str]:
-    """Determine status for semifinals"""
-    if worst_finish_num and worst_finish_num <= 8:
-        return "qualified", "✅"
-    elif rank_num <= 8 or completed_boulders < 4:
-        return "podium-contention", "⚠️"
-    else:
-        return "eliminated", "❌"
-
-
-def determine_general_status(rank_num: float) -> Tuple[str, str]:
-    """Determine status for general competitions"""
-    if rank_num <= 3:
-        emoji = "🥇" if rank_num == 1 else "🥈" if rank_num == 2 else "🥉"
-        return "podium-position", emoji
-    elif rank_num <= 8:
-        return "qualified", "✅"
-    else:
-        return "eliminated", "❌"
-
+# Also replace the create_strategy_display function with this improved version:
 
 def create_strategy_display(row: pd.Series, boulder_info: Dict, competition_name: str) -> str:
     """Create strategy display for boulder competitions"""
@@ -1055,6 +1023,8 @@ def create_strategy_display(row: pd.Series, boulder_info: Dict, competition_name
         
         if strategy_cols:
             strategies = []
+            has_impossible_top8 = False
+            
             for place, col in strategy_cols.items():
                 strategy_value = row.get(col, '')
                 if strategy_value and str(strategy_value) not in ['', 'nan', 'N/A']:
@@ -1068,13 +1038,22 @@ def create_strategy_display(row: pd.Series, boulder_info: Dict, competition_name
                             strategies.append(f"🥉 3rd: {strategy_clean}")
                         elif place == 'top8' and "Semis" in competition_name:
                             strategies.append(f"🎯 Top 8: {strategy_clean}")
+                            # Check if Top 8 is impossible
+                            if "IMPOSSIBLE" in strategy_clean.upper():
+                                has_impossible_top8 = True
             
             if strategies:
                 comp_type = "Final" if "Final" in competition_name else "Semi"
                 strategy_display = f"<br><div class='targets'><strong>{comp_type} Strategy:</strong> {' | '.join(strategies)}</div>"
+                
+                # If Top 8 is impossible in semis, return elimination status
+                if has_impossible_top8 and "Semis" in competition_name:
+                    return strategy_display, "eliminated"
     
     return strategy_display
 
+
+# And update the create_athlete_card function to handle the impossible top 8 case:
 
 def create_athlete_card(position_emoji: str, athlete: str, total_score: any, 
                        boulder_info: Dict, strategy_display: str, card_class: str):
@@ -1082,6 +1061,13 @@ def create_athlete_card(position_emoji: str, athlete: str, total_score: any,
     completed_boulders = boulder_info['completed_boulders']
     boulder_display = boulder_info['boulder_display']
     worst_finish_display = boulder_info['worst_finish_display']
+    
+    # Check if strategy display indicates impossible Top 8
+    if isinstance(strategy_display, tuple):
+        strategy_display, override_class = strategy_display
+        if override_class == "eliminated":
+            card_class = "eliminated"
+            position_emoji = "❌"
     
     # Create detail text based on completion status
     if completed_boulders == 4:
