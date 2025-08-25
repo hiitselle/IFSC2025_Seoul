@@ -613,6 +613,12 @@ def main():
         <p style="margin: 0; opacity: 0.9;">Real-time climbing competition tracking</p>
     </div>
     """, unsafe_allow_html=True)
+
+    st.error("🔥 DEBUG: I AM RIGHT AFTER THE HEADER!")  # ADD THIS LINE
+    
+    test_css_classes()
+    
+    st.write("HELLO WORLD - IF YOU SEE THIS, STREAMLIT IS WORKING")
     
     test_css_classes()
     st.write("HELLO WORLD - IF YOU SEE THIS, STREAMLIT IS WORKING")
