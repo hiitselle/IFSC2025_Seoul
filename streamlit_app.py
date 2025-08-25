@@ -958,20 +958,6 @@ def calculate_boulder_completion(row: pd.Series) -> Dict[str, any]:
 
 
 # Find the determine_athlete_status function and replace it with this improved version:
-def determine_semis_status(rank_num: float, worst_finish_num: Optional[float], completed_boulders: int) -> Tuple[str, str]:
-    """Determine status for semifinals"""
-    # If worst finish is > 8, they're eliminated (can't make top 8)
-    if worst_finish_num and worst_finish_num > 8:
-        return "eliminated", "❌"
-    # If worst finish is <= 8, they're qualified/safe for top 8
-    elif worst_finish_num and worst_finish_num <= 8:
-        return "qualified", "✅"
-    # If current rank is <= 8 or they haven't finished all boulders (still have a chance)
-    elif rank_num <= 8 or completed_boulders < 4:
-        return "podium-contention", "⚠️"
-    # If current rank is > 8 and they've completed all boulders (but no worst finish data)
-    else:
-        return "eliminated", "❌"
         
 def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str) -> Tuple[str, str]:
     """Determine athlete status and appropriate styling"""
@@ -1014,7 +1000,46 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
     
     return card_class, position_emoji
 
+def determine_semis_status(rank_num: float, worst_finish_num: Optional[float], completed_boulders: int) -> Tuple[str, str]:
+    """Determine status for semifinals"""
+    # If worst finish is > 8, they're eliminated (can't make top 8)
+    if worst_finish_num and worst_finish_num > 8:
+        return "eliminated", "❌"
+    # If worst finish is <= 8, they're qualified/safe for top 8
+    elif worst_finish_num and worst_finish_num <= 8:
+        return "qualified", "✅"
+    # If current rank is <= 8 or they haven't finished all boulders (still have a chance)
+    elif rank_num <= 8 or completed_boulders < 4:
+        return "podium-contention", "⚠️"
+    # If current rank is > 8 and they've completed all boulders (but no worst finish data)
+    else:
+        return "eliminated", "❌"
 
+
+def determine_final_status(rank_num: float, worst_finish_num: Optional[float], completed_boulders: int) -> Tuple[str, str]:
+    """Determine status for final competitions"""
+    if worst_finish_num and worst_finish_num <= 3:
+        return "podium-position", "🏆"
+    elif rank_num <= 3 and completed_boulders < 4:
+        return "podium-contention", "⚠️"
+    elif rank_num > 3:
+        if completed_boulders < 4:
+            return "podium-contention", "⚠️"
+        else:
+            return "no-podium", "❌"
+    else:
+        return "podium-contention", "⚠️"
+
+
+def determine_general_status(rank_num: float) -> Tuple[str, str]:
+    """Determine status for general competitions"""
+    if rank_num <= 3:
+        emoji = "🥇" if rank_num == 1 else "🥈" if rank_num == 2 else "🥉"
+        return "podium-position", emoji
+    elif rank_num <= 8:
+        return "qualified", "✅"
+    else:
+        return "eliminated", "❌"
 # Also replace the create_strategy_display function with this improved version:
 
 def create_strategy_display(row: pd.Series, boulder_info: Dict, competition_name: str) -> str:
