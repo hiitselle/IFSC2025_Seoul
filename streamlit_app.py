@@ -1312,9 +1312,9 @@ def create_threshold_display(has_score: bool, qualification_info: Dict[str, str]
         elif key == 'Hold for 3rd':
             thresholds.append(f'🥉 For 3rd Hold: {value}')
         elif key == 'Hold to Qualify':
-            thresholds.append(f'🎯 Target Hold: {value}')
+            thresholds.append(f'🎯 For 8th Hold: {value}')
         elif key == 'Min to Qualify':
-            thresholds.append(f'📊 Final Target Points: {value}')
+            thresholds.append(f'📊 For 8th Points: {value}')
     
     if thresholds:
         return f"<br><div class='targets'><strong>Targets:</strong><br>{' | '.join(thresholds)}</div>"
