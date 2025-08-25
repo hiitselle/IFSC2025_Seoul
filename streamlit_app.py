@@ -1317,9 +1317,7 @@ if __name__ == "__main__":
             st.code(f"Error: {e}")
             st.code(f"Time: {datetime.now()}")
             import traceback
-            st.code(traceback.format_exc()), na=False)) &  # Remove pure numbers
-            (~df['Name'].astype(str).str.match(r'^\d+\+
-
+            st.code(traceback.format_exc())
 
 def is_placeholder_athlete(name: str) -> bool:
     """Check if name is a placeholder like 'Athlete 1', 'Athlete 23', etc."""
