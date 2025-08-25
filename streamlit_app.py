@@ -1162,8 +1162,15 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
             (~df['Name'].apply(is_placeholder_athlete))
         ]
         
-        # Additional filtering for expected athlete counts
-        expected_max = 24 if "Semis" in competition_name else 8 if "Final" in competition_name else 999
+      # Set expected athlete counts based on competition type
+        if "Lead Semis" in competition_name:
+            expected_max = 24
+        elif "Boulder Semis" in competition_name:
+            expected_max = 24
+        elif "Final" in competition_name:
+            expected_max = 8
+        else:
+            expected_max = 999
         if len(active_df) > expected_max and 'Current Rank' in active_df.columns:
             active_df['temp_rank'] = pd.to_numeric(active_df['Current Rank'], errors='coerce')
             active_df = active_df[
