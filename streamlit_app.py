@@ -577,6 +577,27 @@ def display_enhanced_metrics(df: pd.DataFrame, competition_name: str):
                 <h2>{metrics["leader"][:15]}{"..." if len(metrics["leader"]) > 15 else ""}</h2>
             </div>
             ''', unsafe_allow_html=True)
+
+    def test_css_classes():
+    """Test function to verify CSS classes work - call this in your main function temporarily"""
+    st.markdown("### 🧪 CSS Test (Remove this after testing)")
+    
+    test_classes = [
+        ("qualified", "✅ Should be GREEN"),
+        ("podium-position", "🏆 Should be GREEN/GOLD"), 
+        ("podium-contention", "⚠️ Should be YELLOW"),
+        ("eliminated", "❌ Should be RED"),
+        ("no-podium", "❌ Should be RED"),
+        ("awaiting-result", "⏳ Should be GRAY")
+    ]
+    
+    for css_class, description in test_classes:
+        st.markdown(f"""
+        <div class="athlete-row {css_class}">
+            <strong>{description}</strong><br>
+            <small>Class: {css_class}</small>
+        </div>
+        """, unsafe_allow_html=True)
     
     elif "Lead" in competition_name:
         metrics = MetricsCalculator.calculate_lead_metrics(df)
