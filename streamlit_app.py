@@ -960,9 +960,6 @@ def calculate_boulder_completion(row: pd.Series) -> Dict[str, any]:
 # Find the determine_athlete_status function and replace it with this improved version:
 def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str) -> Tuple[str, str]:
     """Determine athlete status and appropriate styling"""
-    card_class = ""
-    position_emoji = ""
-    
     try:
         rank_num = DataProcessor.safe_numeric_conversion(rank)
         completed_boulders = boulder_info['completed_boulders']
@@ -972,49 +969,42 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
         worst_finish_num = None
         if worst_finish_display and "Worst Finish: " in worst_finish_display:
             try:
-                worst_parts = worst_finish_display.split("Worst Finish: ")
-                if len(worst_parts) > 1:
-                    worst_finish_num = float(worst_parts[1])
+                worst_finish_num = float(worst_finish_display.split("Worst Finish: ")[1])
             except:
                 pass
         
-        # Apply status logic based on completion and competition type
-        if completed_boulders == 4 or (total_score not in ['N/A', '', None] and not pd.isna(total_score)):
-            if "Final" in competition_name:
-                card_class, position_emoji = determine_final_status(rank_num, worst_finish_num, completed_boulders)
-            elif "Semis" in competition_name:
-                # Boulder Semis specific logic
-                if "Boulder" in competition_name:
-                    if worst_finish_num and worst_finish_num > 8:
-                        card_class, position_emoji = "eliminated", "❌"
-                    elif worst_finish_num and worst_finish_num <= 8:
-                        card_class, position_emoji = "qualified", "✅"
-                    elif rank_num <= 8:
-                        card_class, position_emoji = "podium-contention", "⚠️"
+        # FOR BOULDER SEMIS - Simple logic
+        if "Boulder" in competition_name and "Semis" in competition_name:
+            if completed_boulders == 4:  # Finished all boulders
+                if worst_finish_num:
+                    if worst_finish_num <= 8:
+                        return "qualified", "✅"  # Safe for top 8
                     else:
-                        card_class, position_emoji = "eliminated", "❌"
+                        return "eliminated", "❌"  # Can't make top 8
                 else:
-                    card_class, position_emoji = determine_semis_status(rank_num, worst_finish_num, completed_boulders)
+                    # Use current rank
+                    if rank_num <= 8:
+                        return "qualified", "✅"
+                    else:
+                        return "eliminated", "❌"
             else:
-                card_class, position_emoji = determine_general_status(rank_num)
-        else:
-            # Still competing
-            if rank_num <= 8:
-                card_class, position_emoji = "podium-contention", "⚠️"
-            else:
-                position_emoji = f"#{rank_num}"
+                # Still competing
+                if rank_num <= 8:
+                    return "podium-contention", "⚠️"
+                else:
+                    return "podium-contention", "⚠️"  # Still has a chance
         
-        # Fallback for rank display
-        if not position_emoji and rank_num > 0:
-            position_emoji = f"#{rank_num}"
+        # FOR OTHER COMPETITIONS - Basic logic
+        if rank_num <= 3:
+            return "podium-position", "🏆"
+        elif rank_num <= 8:
+            return "qualified", "✅"
+        else:
+            return "eliminated", "❌"
             
     except Exception as e:
         logger.warning(f"Error determining athlete status: {e}")
-        rank_num = DataProcessor.safe_numeric_conversion(rank)
-        if rank_num > 0:
-            position_emoji = f"#{rank_num}"
-    
-    return card_class, position_emoji
+        return "", f"#{DataProcessor.safe_numeric_conversion(rank)}"
 
 def determine_semis_status(rank_num: float, worst_finish_num: Optional[float], completed_boulders: int) -> Tuple[str, str]:
     """Determine status for semifinals"""
