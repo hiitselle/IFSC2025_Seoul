@@ -1847,12 +1847,13 @@ if __name__ == "__main__":
         st.error(f"🚫 Application Error: {e}")
         st.markdown("Please refresh the page or contact support if the issue persists.")
         
+        
         with st.expander("🔧 Debug Information"):
             st.code(f"Error: {e}")
             st.code(f"Time: {datetime.now()}")
             import traceback
-            st.code(traceback.format_exc()), na=False)) &  # Remove pure numbers
-            (~df['Name'].astype(str).str.match(r'^\d+\+
+            st.code(traceback.format_exc())
+            (~df['Name'].astype(str).str.match(r'^\d+\+'
 
 
 def is_placeholder_athlete(name: str) -> bool:
