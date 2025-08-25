@@ -460,6 +460,27 @@ class DataLoader:
 
 class MetricsCalculator:
     """Enhanced metrics calculation"""
+
+    def test_css_classes():
+    """Test function to verify CSS classes work"""
+    st.markdown("### 🧪 CSS Test (Remove this after testing)")
+    
+    test_classes = [
+        ("qualified", "✅ Should be GREEN"),
+        ("podium-position", "🏆 Should be GREEN/GOLD"), 
+        ("podium-contention", "⚠️ Should be YELLOW"),
+        ("eliminated", "❌ Should be RED"),
+        ("no-podium", "❌ Should be RED"),
+        ("awaiting-result", "⏳ Should be GRAY")
+    ]
+    
+    for css_class, description in test_classes:
+        st.markdown(f"""
+        <div class="athlete-row {css_class}">
+            <strong>{description}</strong><br>
+            <small>Class: {css_class}</small>
+        </div>
+        """, unsafe_allow_html=True)
     
     @staticmethod
     def calculate_boulder_metrics(df: pd.DataFrame) -> Dict[str, any]:
@@ -498,26 +519,6 @@ class MetricsCalculator:
             logger.error(f"Error calculating boulder metrics: {e}")
             return {'total_athletes': 0, 'completed_problems': 0, 'avg_score': 0, 'leader': 'TBD'}
 
-    def test_css_classes():
-    """Test function to verify CSS classes work"""
-    st.markdown("### 🧪 CSS Test (Remove this after testing)")
-    
-    test_classes = [
-        ("qualified", "✅ Should be GREEN"),
-        ("podium-position", "🏆 Should be GREEN/GOLD"), 
-        ("podium-contention", "⚠️ Should be YELLOW"),
-        ("eliminated", "❌ Should be RED"),
-        ("no-podium", "❌ Should be RED"),
-        ("awaiting-result", "⏳ Should be GRAY")
-    ]
-    
-    for css_class, description in test_classes:
-        st.markdown(f"""
-        <div class="athlete-row {css_class}">
-            <strong>{description}</strong><br>
-            <small>Class: {css_class}</small>
-        </div>
-        """, unsafe_allow_html=True)
     
     @staticmethod
     def calculate_lead_metrics(df: pd.DataFrame) -> Dict[str, any]:
@@ -621,7 +622,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-   
+   test_css_classes()
     
     # Enhanced sidebar
     st.sidebar.title("🎯 Dashboard Controls")
