@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import logging
 import re
 import os
+import unicodedata
 from typing import Dict, Tuple, List, Optional
 
 # Configure logging
@@ -1267,7 +1268,7 @@ def display_lead_athletes(active_df: pd.DataFrame, qualification_info: Dict[str,
         name = DataProcessor.clean_text(str(row.get('Name', 'Unknown')))
         score = row.get('Manual Score', 'N/A')
         rank = row.get('Current Rank', 'N/A')
-        status = DataProcessor.clean_text(str(row.get('Status', 'Unknown'))).replace(' à', '').replace('à', '')
+        status = unicodedata.normalize('NFD', DataProcessor.clean_text(str(row.get('Status', 'Unknown')))).encode('ascii', 'ignore').decode('ascii').strip()
         worst_finish = row.get('Worst Finish', 'N/A')
         
         # Determine if athlete has a score
