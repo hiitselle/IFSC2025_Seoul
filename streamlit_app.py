@@ -1,4 +1,68 @@
-with col2:
+import streamlit as st
+import pandas as pd
+import requests
+from io import StringIO
+import time
+from datetime import datetime, timedelta
+import logging
+import re
+import os
+from typing import Dict, Tuple, List, Optional
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Configure the page
+st.set_page_config(
+    page_title="🧗‍♂️ IFSC 2025 World Championships",
+    page_icon="🧗‍♂️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Enhanced CSS with better mobile responsiveness
+st.markdown("""
+<style>
+    /* Main header styling */
+    .main-header {
+        text-align: center;
+        padding: 2rem 1rem;
+        background: linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1);
+        color: white;
+        margin-bottom: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        animation: fadeIn 1s ease-in;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Responsive athlete cards */
+    .athlete-row {
+        padding: 1rem;
+        margin: 0.5rem 0;
+        border-radius: 12px;
+        font-weight: 500;
+        border: 2px solid transparent;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown(f'''
+        <div class="metric-card">
+            <h4>🏆 Total</h4>
+            <h2>{overview_metrics["total"]}</h2>
+        </div>
+        ''', unsafe_allow_html=True)
+    
+    with col2:  # ✅ Properly indented with 4 spaces
         st.markdown(f'''
         <div class="metric-card">
             <h4>🔴 Live</h4>
@@ -6,7 +70,7 @@ with col2:
         </div>
         ''', unsafe_allow_html=True)
     
-    with col3:
+    with col3:  # ✅ Properly indented with 4 spaces
         st.markdown(f'''
         <div class="metric-card">
             <h4>✅ Completed</h4>
