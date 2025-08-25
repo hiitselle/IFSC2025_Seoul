@@ -1147,7 +1147,6 @@ def extract_qualification_info(df: pd.DataFrame) -> Dict[str, str]:
         logger.warning(f"Error extracting qualification thresholds: {e}")
     return qualification_info
 
-
 def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFrame:
     """Filter out reference rows to get only active athletes"""
     try:
@@ -1166,7 +1165,7 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
         if "Lead Semis" in competition_name:
             expected_max = 24
         elif "Boulder Semis" in competition_name:
-            expected_max = 24
+            expected_max = 20
         elif "Final" in competition_name:
             expected_max = 8
         else:
@@ -1175,9 +1174,8 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
         # For Lead Semis, take the first 24 athletes regardless of rank validity
         if "Lead Semis" in competition_name:
             if len(active_df) >= 24:
-                # Take first 24 athletes
                 active_df = active_df.head(24)
-                logger.info(f"{competition_name}: Using first 24 athletes (found {len(active_df)})")
+                logger.info(f"{competition_name}: Using first 24 athletes")
             else:
                 logger.warning(f"{competition_name}: Only found {len(active_df)} athletes, expected 24")
         
@@ -1185,21 +1183,17 @@ def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFr
         elif expected_max < 999 and len(active_df) > expected_max and 'Current Rank' in active_df.columns:
             active_df['temp_rank'] = pd.to_numeric(active_df['Current Rank'], errors='coerce')
             
-            # Try rank-based filtering first
             rank_filtered = active_df[
                 (active_df['temp_rank'].notna()) & 
                 (active_df['temp_rank'] >= 1) & 
                 (active_df['temp_rank'] <= expected_max)
             ]
             
-            # If rank filtering gives us the expected count, use it
             if len(rank_filtered) == expected_max:
                 active_df = rank_filtered.drop('temp_rank', axis=1)
             else:
-                # Otherwise, just take the first N athletes
                 active_df = active_df.drop('temp_rank', axis=1).head(expected_max)
         
-        # For any other case where we have too many, just take the first N
         elif expected_max < 999 and len(active_df) > expected_max:
             active_df = active_df.head(expected_max)
         
