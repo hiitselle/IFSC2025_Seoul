@@ -958,6 +958,8 @@ def calculate_boulder_completion(row: pd.Series) -> Dict[str, any]:
 
 
 # Find the determine_athlete_status function and replace it with this improved version:
+# Replace the determine_athlete_status function with this improved version:
+
 def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str) -> Tuple[str, str]:
     """Determine athlete status and appropriate styling"""
     try:
@@ -969,42 +971,118 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
         worst_finish_num = None
         if worst_finish_display and "Worst Finish: " in worst_finish_display:
             try:
-                worst_finish_num = float(worst_finish_display.split("Worst Finish: ")[1])
+                worst_finish_str = worst_finish_display.split("Worst Finish: ")[1].strip()
+                worst_finish_num = float(worst_finish_str)
             except:
                 pass
         
-        # FOR BOULDER SEMIS - Simple logic
+        # FOR BOULDER SEMIS - Clear logic with proper fallbacks
         if "Boulder" in competition_name and "Semis" in competition_name:
             if completed_boulders == 4:  # Finished all boulders
-                if worst_finish_num:
+                if worst_finish_num is not None:
                     if worst_finish_num <= 8:
-                        return "qualified", "✅"  # Safe for top 8
+                        return "qualified", "✅"  # Safe for top 8 (GREEN)
                     else:
-                        return "eliminated", "❌"  # Can't make top 8
+                        return "eliminated", "❌"  # Can't make top 8 (RED)
+                else:
+                    # Use current rank as fallback
+                    if rank_num > 0 and rank_num <= 8:
+                        return "qualified", "✅"  # GREEN
+                    elif rank_num > 8:
+                        return "eliminated", "❌"  # RED
+                    else:
+                        return "awaiting-result", "⏳"  # GRAY
+            else:
+                # Still competing - use current rank to show contention
+                if rank_num > 0 and rank_num <= 8:
+                    return "podium-contention", "⚠️"  # YELLOW
+                elif rank_num > 8:
+                    return "podium-contention", "⏰"  # YELLOW (still has chance)
+                else:
+                    return "awaiting-result", "⏳"  # GRAY
+        
+        # FOR BOULDER FINALS - Clear logic
+        elif "Boulder" in competition_name and "Final" in competition_name:
+            if completed_boulders == 4:  # Finished all boulders
+                if worst_finish_num is not None:
+                    if worst_finish_num <= 3:
+                        return "podium-position", "🏆"  # GOLD/GREEN
+                    else:
+                        return "no-podium", "❌"  # RED
                 else:
                     # Use current rank
-                    if rank_num <= 8:
-                        return "qualified", "✅"
+                    if rank_num > 0 and rank_num <= 3:
+                        return "podium-position", "🏆"  # GREEN
+                    elif rank_num > 3:
+                        return "no-podium", "❌"  # RED
                     else:
-                        return "eliminated", "❌"
+                        return "awaiting-result", "⏳"  # GRAY
             else:
-                # Still competing
-                if rank_num <= 8:
-                    return "podium-contention", "⚠️"
+                # Still competing in final
+                if rank_num > 0 and rank_num <= 3:
+                    return "podium-contention", "⚠️"  # YELLOW
+                elif rank_num > 3:
+                    return "podium-contention", "💪"  # YELLOW (fighting for podium)
                 else:
-                    return "podium-contention", "⚠️"  # Still has a chance
+                    return "awaiting-result", "⏳"  # GRAY
         
-        # FOR OTHER COMPETITIONS - Basic logic
-        if rank_num <= 3:
-            return "podium-position", "🏆"
-        elif rank_num <= 8:
-            return "qualified", "✅"
+        # FOR OTHER BOULDER COMPETITIONS - Basic logic with fallbacks
         else:
-            return "eliminated", "❌"
+            if rank_num > 0:
+                if rank_num <= 3:
+                    emoji = "🥇" if rank_num == 1 else "🥈" if rank_num == 2 else "🥉"
+                    return "podium-position", emoji  # GREEN
+                elif rank_num <= 8:
+                    return "qualified", "✅"  # GREEN
+                else:
+                    return "eliminated", "❌"  # RED
+            else:
+                return "awaiting-result", "⏳"  # GRAY
             
     except Exception as e:
         logger.warning(f"Error determining athlete status: {e}")
-        return "", f"#{DataProcessor.safe_numeric_conversion(rank)}"
+        # Always return a valid fallback
+        rank_num = DataProcessor.safe_numeric_conversion(rank, default=999)
+        if rank_num <= 8:
+            return "podium-contention", f"#{int(rank_num)}"  # YELLOW
+        else:
+            return "awaiting-result", f"#{int(rank_num)}"  # GRAY
+
+
+# Also replace the determine_lead_athlete_status function:
+
+def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, str]:
+    """Determine lead athlete status and styling - always returns a valid class"""
+    if not has_score:
+        return "awaiting-result", "📄"  # GRAY
+    
+    status_lower = status.lower() if status else ""
+    
+    # Check for qualified/safe status
+    if "qualified" in status_lower or "✓✓" in status or "safe" in status_lower:
+        return "qualified", "✅"  # GREEN
+    
+    # Check for elimination
+    elif "eliminated" in status_lower or "✗" in status or "out" in status_lower:
+        return "eliminated", "❌"  # RED
+    
+    # Check for podium position
+    elif ("podium" in status_lower and "no podium" not in status_lower and 
+          "contention" not in status_lower):
+        return "podium-position", "🏆"  # GREEN/GOLD
+    
+    # Check for podium contention
+    elif ("podium contention" in status_lower or "contention" in status_lower or
+          "fighting" in status_lower):
+        return "podium-contention", "⚠️"  # YELLOW
+    
+    # Check for no podium
+    elif "no podium" in status_lower:
+        return "no-podium", "❌"  # RED
+    
+    # Default case - if has score but status unclear, assume contention
+    else:
+        return "podium-contention", "📊"  # YELLOW
 
 def determine_semis_status(rank_num: float, worst_finish_num: Optional[float], completed_boulders: int) -> Tuple[str, str]:
     """Determine status for semifinals"""
@@ -1101,13 +1179,14 @@ def create_strategy_display(row: pd.Series, boulder_info: Dict, competition_name
 # And update the create_athlete_card function to handle the impossible top 8 case:
 def create_athlete_card(position_emoji: str, athlete: str, total_score: any, 
                        boulder_info: Dict, strategy_display: str, card_class: str):
-    """Create and display an athlete card"""
+    """Create and display an athlete card with guaranteed styling"""
     completed_boulders = boulder_info['completed_boulders']
     boulder_display = boulder_info['boulder_display']
     worst_finish_display = boulder_info['worst_finish_display']
     
-    # DEBUG: Show what card_class is being determined
-    debug_info = f"DEBUG: {athlete} - card_class: '{card_class}', worst_finish: '{worst_finish_display}'"
+    # Ensure card_class is never empty
+    if not card_class or card_class.strip() == "":
+        card_class = "awaiting-result"  # Default to gray if no class
     
     # Check if strategy display indicates impossible Top 8
     if isinstance(strategy_display, tuple):
@@ -1115,7 +1194,6 @@ def create_athlete_card(position_emoji: str, athlete: str, total_score: any,
         if override_class == "eliminated":
             card_class = "eliminated"
             position_emoji = "❌"
-            debug_info += " - OVERRIDDEN by strategy"
     
     # Create detail text based on completion status
     if completed_boulders == 4:
@@ -1125,6 +1203,9 @@ def create_athlete_card(position_emoji: str, athlete: str, total_score: any,
     else:
         detail_text = f"Total: {total_score} | {boulder_display} | Progress: {completed_boulders}/4"
     
+    # Debug info to see what's happening (remove this in production)
+    debug_info = f"Class: {card_class}"
+    
     st.markdown(f"""
     <div class="athlete-row {card_class}">
         <strong>{position_emoji} - {athlete}</strong><br>
@@ -1132,7 +1213,6 @@ def create_athlete_card(position_emoji: str, athlete: str, total_score: any,
         <small style="color: gray; font-size: 0.7rem;">{debug_info}</small>
     </div>
     """, unsafe_allow_html=True)
-
 
 def display_lead_results(df: pd.DataFrame, competition_name: str):
     """Enhanced lead competition results display"""
@@ -1356,23 +1436,6 @@ def create_threshold_display(has_score: bool, qualification_info: Dict[str, str]
     return ""
 
 
-def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, str]:
-    """Determine lead athlete status and styling"""
-    if not has_score:
-        return "", "📄"
-    
-    if "Qualified" in status or "✓✓" in status:
-        return "qualified", "✅"
-    elif "Eliminated" in status or "✗" in status:
-        return "eliminated", "❌"
-    elif "Podium" in status and "No Podium" not in status and "Contention" not in status:
-        return "podium-position", "🏆"
-    elif "Podium Contention" in status or "Contention" in status:
-        return "podium-contention", "⚠️"
-    elif "No Podium" in status:
-        return "no-podium", "❌"
-    else:
-        return "", "📄"
 
 
 def get_lead_position_emoji(rank: any, has_score: bool, card_class: str, status_emoji: str) -> str:
