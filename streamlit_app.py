@@ -8,7 +8,18 @@ import logging
 import re
 import os
 import unicodedata
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple, List, Optional, Any, Callable
+import hashlib
+import hmac
+from collections import defaultdict, deque
+from functools import wraps
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
+from scipy import stats
+from concurrent.futures import ThreadPoolExecutor
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,7 +33,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Enhanced CSS with better mobile responsiveness
+# Enhanced CSS with better mobile responsiveness and all improvements
 st.markdown("""
 <style>
     /* Main header styling */
@@ -222,39 +233,86 @@ st.markdown("""
         transition: width 0.3s ease;
     }
     
+    /* Live notifications */
+    .live-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #17a2b8;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 9999;
+        animation: slideIn 0.5s ease-out;
+        max-width: 300px;
+        word-wrap: break-word;
+    }
+    
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    
     /* Mobile responsiveness */
     @media (max-width: 768px) {
+        .main-header h1 {
+            font-size: 1.5rem !important;
+        }
+        .main-header h3 {
+            font-size: 1.2rem !important;
+        }
         .metric-card {
-            padding: 1rem 0.5rem;
+            padding: 0.8rem 0.5rem !important;
         }
-        
+        .metric-card h4 {
+            font-size: 0.8rem !important;
+        }
         .metric-card h2 {
-            font-size: 1.4rem;
+            font-size: 1.3rem !important;
         }
-        
         .athlete-row {
-            padding: 0.8rem;
+            padding: 0.6rem !important;
+            margin: 0.3rem 0 !important;
         }
-        
         .athlete-row strong {
-            font-size: 1rem;
+            font-size: 0.9rem !important;
         }
-        
-        .athlete-row .targets {
-            font-size: 0.8rem;
-            padding: 0.5rem 0.6rem;
+        .athlete-row small {
+            font-size: 0.8rem !important;
+        }
+    }
+    
+    /* Touch-friendly buttons */
+    @media (hover: none) and (pointer: coarse) {
+        .athlete-row:hover {
+            transform: none !important;
+        }
+        button {
+            min-height: 44px !important;
         }
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Configuration with enhanced settings
+# Enhanced configuration with security settings
 class Config:
     CACHE_TTL = 30
     AUTO_REFRESH_INTERVAL = 60
     MAX_RETRIES = 3
     REQUEST_TIMEOUT = 15
     MAX_ATHLETES_DISPLAY = 50
+    
+    # Performance settings
+    CONCURRENT_REQUESTS = True
+    BATCH_SIZE = 4
+    MEMORY_LIMIT_MB = 100
+    
+    # Security settings
+    ENABLE_RATE_LIMITING = True
+    MAX_REQUESTS_PER_MINUTE = 30
+    MAX_CONCURRENT_CONNECTIONS = 5
+    ENABLE_REQUEST_SIGNING = True
     
     # Google Sheets URLs
     SHEETS_URLS = {
@@ -317,6 +375,275 @@ class DataProcessor:
             issues.append("Insufficient data rows")
         
         return len(issues) == 0, issues
+
+class SecurityManager:
+    """Enhanced security management for the application"""
+    
+    # Whitelist of allowed domains for data fetching
+    ALLOWED_DOMAINS = {
+        'docs.google.com',
+        'sheets.googleapis.com',
+        'drive.google.com'
+    }
+    
+    # Maximum data size limits
+    MAX_CSV_SIZE_MB = 10
+    MAX_DATAFRAME_ROWS = 10000
+    MAX_DATAFRAME_COLUMNS = 100
+    
+    @staticmethod
+    def validate_url(url: str) -> bool:
+        """Validate that URL is from allowed domains"""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            domain = parsed.netloc.lower()
+            
+            # Remove www. prefix if present
+            if domain.startswith('www.'):
+                domain = domain[4:]
+            
+            return domain in SecurityManager.ALLOWED_DOMAINS
+            
+        except Exception as e:
+            logger.warning(f"URL validation failed for {url}: {e}")
+            return False
+    
+    @staticmethod
+    def sanitize_input(input_str: str) -> str:
+        """Sanitize user input to prevent injection attacks"""
+        if not isinstance(input_str, str):
+            return str(input_str)
+        
+        # Remove potentially dangerous characters
+        sanitized = re.sub(r'[<>"\';\\]', '', input_str)
+        
+        # Limit length
+        sanitized = sanitized[:1000]
+        
+        # Remove multiple spaces
+        sanitized = re.sub(r'\s+', ' ', sanitized).strip()
+        
+        return sanitized
+    
+    @staticmethod
+    def validate_dataframe_size(df: pd.DataFrame) -> Tuple[bool, str]:
+        """Validate DataFrame size limits"""
+        if df.empty:
+            return True, "DataFrame is empty"
+        
+        # Check row count
+        if len(df) > SecurityManager.MAX_DATAFRAME_ROWS:
+            return False, f"DataFrame has {len(df)} rows, maximum allowed is {SecurityManager.MAX_DATAFRAME_ROWS}"
+        
+        # Check column count
+        if len(df.columns) > SecurityManager.MAX_DATAFRAME_COLUMNS:
+            return False, f"DataFrame has {len(df.columns)} columns, maximum allowed is {SecurityManager.MAX_DATAFRAME_COLUMNS}"
+        
+        # Check memory usage
+        memory_mb = df.memory_usage(deep=True).sum() / 1024 / 1024
+        if memory_mb > SecurityManager.MAX_CSV_SIZE_MB:
+            return False, f"DataFrame uses {memory_mb:.1f}MB, maximum allowed is {SecurityManager.MAX_CSV_SIZE_MB}MB"
+        
+        return True, "DataFrame size is acceptable"
+
+class RateLimiter:
+    """Rate limiting system to prevent abuse"""
+    
+    def __init__(self):
+        self.requests = defaultdict(deque)  # IP -> deque of timestamps
+        self.blocked_ips = set()
+        self.block_duration = 300  # 5 minutes
+        self.blocked_until = {}
+    
+    def is_rate_limited(self, identifier: str, max_requests: int = 60, 
+                       time_window: int = 60) -> Tuple[bool, int]:
+        """
+        Check if identifier is rate limited
+        Returns: (is_limited, time_until_reset)
+        """
+        current_time = time.time()
+        
+        # Check if currently blocked
+        if identifier in self.blocked_until:
+            if current_time < self.blocked_until[identifier]:
+                remaining = int(self.blocked_until[identifier] - current_time)
+                return True, remaining
+            else:
+                # Block expired
+                del self.blocked_until[identifier]
+                self.blocked_ips.discard(identifier)
+        
+        # Clean old requests
+        request_queue = self.requests[identifier]
+        while request_queue and request_queue[0] < current_time - time_window:
+            request_queue.popleft()
+        
+        # Check rate limit
+        if len(request_queue) >= max_requests:
+            # Block the identifier
+            self.blocked_ips.add(identifier)
+            self.blocked_until[identifier] = current_time + self.block_duration
+            return True, self.block_duration
+        
+        # Add current request
+        request_queue.append(current_time)
+        return False, 0
+    
+    def get_rate_limit_status(self, identifier: str, max_requests: int = 60, 
+                            time_window: int = 60) -> Dict[str, any]:
+        """Get current rate limit status for identifier"""
+        current_time = time.time()
+        request_queue = self.requests[identifier]
+        
+        # Clean old requests
+        while request_queue and request_queue[0] < current_time - time_window:
+            request_queue.popleft()
+        
+        remaining_requests = max(0, max_requests - len(request_queue))
+        reset_time = int(current_time + time_window)
+        
+        return {
+            'remaining_requests': remaining_requests,
+            'reset_time': reset_time,
+            'is_blocked': identifier in self.blocked_ips,
+            'block_remaining': max(0, int(self.blocked_until.get(identifier, 0) - current_time))
+        }
+
+class SecureDataLoader:
+    """Enhanced DataLoader with security features"""
+    
+    def __init__(self):
+        self.rate_limiter = RateLimiter()
+        self.security_manager = SecurityManager()
+    
+    @staticmethod
+    def get_client_identifier() -> str:
+        """Get client identifier for rate limiting"""
+        # In Streamlit Cloud, we can use session state as identifier
+        if 'client_id' not in st.session_state:
+            st.session_state.client_id = hashlib.md5(
+                f"{time.time()}:{id(st.session_state)}".encode()
+            ).hexdigest()
+        return st.session_state.client_id
+    
+    @st.cache_data(ttl=Config.CACHE_TTL, show_spinner=False)
+    def load_sheet_data_secure(_self, url: str, retries: int = 0) -> pd.DataFrame:
+        """Securely load sheet data with rate limiting and validation"""
+        client_id = _self.get_client_identifier()
+        
+        # Check rate limiting
+        is_limited, wait_time = _self.rate_limiter.is_rate_limited(client_id, max_requests=30, time_window=60)
+        if is_limited:
+            st.error(f"🚫 Rate limit exceeded. Please wait {wait_time} seconds before trying again.")
+            return pd.DataFrame()
+        
+        # Validate URL
+        if not _self.security_manager.validate_url(url):
+            st.error("🚫 Access denied: URL not in allowed domains list.")
+            return pd.DataFrame()
+        
+        try:
+            # Enhanced request headers with security
+            current_timestamp = int(time.time())
+            
+            headers = {
+                'User-Agent': 'IFSC-Climbing-Dashboard/1.0',
+                'Accept': 'text/csv,application/csv,text/plain',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive',
+                'Cache-Control': 'max-age=30',
+                'Referer': 'https://ifsc-climbing-dashboard.streamlit.app'
+            }
+            
+            # Make request with timeout and size limits
+            response = requests.get(
+                url, 
+                timeout=Config.REQUEST_TIMEOUT,
+                headers=headers,
+                stream=True
+            )
+            response.raise_for_status()
+            
+            # Check content size before processing
+            content_length = response.headers.get('content-length')
+            if content_length and int(content_length) > _self.security_manager.MAX_CSV_SIZE_MB * 1024 * 1024:
+                raise ValueError(f"Response too large: {content_length} bytes")
+            
+            # Read content with size limit
+            content = ""
+            total_size = 0
+            max_size = _self.security_manager.MAX_CSV_SIZE_MB * 1024 * 1024
+            
+            for chunk in response.iter_content(chunk_size=8192, decode_unicode=True):
+                if chunk:
+                    total_size += len(chunk.encode('utf-8'))
+                    if total_size > max_size:
+                        raise ValueError(f"Response exceeded maximum size of {_self.security_manager.MAX_CSV_SIZE_MB}MB")
+                    content += chunk
+            
+            # Process CSV data
+            csv_data = StringIO(content)
+            df = pd.read_csv(
+                csv_data, 
+                encoding='utf-8', 
+                low_memory=False,
+                dtype=str,
+                na_values=['', 'N/A', 'TBD', 'TBA'],
+                nrows=_self.security_manager.MAX_DATAFRAME_ROWS  # Limit rows
+            )
+            
+            # Validate DataFrame size
+            is_valid, message = _self.security_manager.validate_dataframe_size(df)
+            if not is_valid:
+                logger.warning(f"Data size warning: {message}")
+                # Truncate if necessary
+                if len(df) > _self.security_manager.MAX_DATAFRAME_ROWS:
+                    df = df.head(_self.security_manager.MAX_DATAFRAME_ROWS)
+            
+            # Clean and sanitize data
+            df = _self._clean_and_sanitize_dataframe(df)
+            
+            logger.info(f"Securely loaded data: {len(df)} rows, {len(df.columns)} columns")
+            return df
+            
+        except requests.RequestException as e:
+            error_msg = f"Network error: {str(e)}"
+            logger.error(error_msg)
+            
+            if retries < Config.MAX_RETRIES:
+                wait_time = 2 ** retries
+                logger.info(f"Retrying in {wait_time}s... attempt {retries + 1}")
+                time.sleep(wait_time)
+                return _self.load_sheet_data_secure(url, retries + 1)
+            
+            return pd.DataFrame()
+            
+        except ValueError as e:
+            logger.error(f"Data validation error: {str(e)}")
+            return pd.DataFrame()
+            
+        except Exception as e:
+            logger.error(f"Unexpected error loading data: {e}")
+            return pd.DataFrame()
+    
+    def _clean_and_sanitize_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean and sanitize DataFrame with security considerations"""
+        # Basic cleaning
+        df = df.dropna(how='all')
+        
+        # Sanitize column names
+        df.columns = [self.security_manager.sanitize_input(str(col)) for col in df.columns]
+        
+        # Remove unnamed columns
+        columns_to_keep = [col for col in df.columns if not str(col).startswith('Unnamed')]
+        df = df[columns_to_keep]
+        
+        # Sanitize text data
+        for col in df.select_dtypes(include=['object']).columns:
+            df[col] = df[col].astype(str).apply(self.security_manager.sanitize_input)
+        
+        return df
 
 class CompetitionStatusDetector:
     """Enhanced competition status detection"""
@@ -381,77 +708,6 @@ class CompetitionStatusDetector:
             return "live", "🔴"
         else:
             return "upcoming", "📄"
-
-class DataLoader:
-    """Enhanced data loading with better error handling and caching"""
-    
-    @staticmethod
-    @st.cache_data(ttl=Config.CACHE_TTL, show_spinner=False)
-    def load_sheet_data(url: str, retries: int = 0) -> pd.DataFrame:
-        """Load data from Google Sheets with enhanced error handling"""
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'text/csv,text/plain,*/*',
-                'Accept-Encoding': 'gzip, deflate',
-                'Connection': 'keep-alive'
-            }
-            
-            response = requests.get(
-                url, 
-                timeout=Config.REQUEST_TIMEOUT,
-                headers=headers,
-                stream=True
-            )
-            response.raise_for_status()
-            
-            # Read CSV data with better encoding handling
-            csv_data = StringIO(response.text)
-            df = pd.read_csv(csv_data, encoding='utf-8', low_memory=False)
-            
-            # Enhanced data cleaning
-            df = DataLoader._clean_dataframe(df)
-            
-            logger.info(f"Successfully loaded data: {len(df)} rows, {len(df.columns)} columns")
-            return df
-            
-        except requests.RequestException as e:
-            error_msg = f"Network error: {str(e)}"
-            logger.error(error_msg)
-            
-            if retries < Config.MAX_RETRIES:
-                logger.info(f"Retrying... attempt {retries + 1}")
-                time.sleep(2 ** retries)
-                return DataLoader.load_sheet_data(url, retries + 1)
-            
-            st.error(f"🚫 {error_msg}")
-            return pd.DataFrame()
-            
-        except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
-            logger.error(error_msg)
-            st.error(f"🚫 {error_msg}")
-            return pd.DataFrame()
-    
-    @staticmethod
-    def _clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-        """Enhanced DataFrame cleaning"""
-        # Remove completely empty rows
-        df = df.dropna(how='all')
-        
-        # Clean column names
-        df.columns = df.columns.str.strip()
-        
-        # Remove unnamed columns
-        unnamed_cols = [col for col in df.columns if str(col).startswith('Unnamed')]
-        df = df.drop(columns=unnamed_cols, errors='ignore')
-        
-        # Clean text data
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                df[col] = df[col].apply(DataProcessor.clean_text)
-        
-        return df
 
 class MetricsCalculator:
     """Enhanced metrics calculation"""
@@ -534,6 +790,612 @@ class MetricsCalculator:
             logger.error(f"Error calculating lead metrics: {e}")
             return {'total_athletes': 0, 'completed': 0, 'avg_score': 0, 'leader': 'TBD'}
 
+class CompetitionAnalytics:
+    """Advanced analytics for competition data"""
+    
+    @staticmethod
+    def calculate_performance_trends(df: pd.DataFrame, competition_name: str) -> Dict[str, Any]:
+        """Calculate performance trends and statistics"""
+        analytics = {
+            'total_athletes': 0,
+            'completion_rate': 0,
+            'average_performance': 0,
+            'performance_distribution': [],
+            'difficulty_analysis': {},
+            'progression_insights': []
+        }
+        
+        try:
+            if "Boulder" in competition_name:
+                analytics.update(CompetitionAnalytics._analyze_boulder_performance(df))
+            elif "Lead" in competition_name:
+                analytics.update(CompetitionAnalytics._analyze_lead_performance(df))
+                
+        except Exception as e:
+            logger.error(f"Error calculating analytics for {competition_name}: {e}")
+            
+        return analytics
+    
+    @staticmethod
+    def _analyze_boulder_performance(df: pd.DataFrame) -> Dict[str, Any]:
+        """Analyze boulder competition performance"""
+        analytics = {}
+        
+        try:
+            # Find boulder score columns
+            boulder_cols = [col for col in df.columns if 'Boulder' in str(col) and 'Score' in str(col)]
+            
+            if not boulder_cols or df.empty:
+                return analytics
+            
+            # Calculate completion rates per boulder
+            boulder_completion = {}
+            boulder_avg_scores = {}
+            
+            for col in boulder_cols:
+                boulder_num = col.split()[1] if len(col.split()) > 1 else col
+                numeric_scores = pd.to_numeric(df[col], errors='coerce')
+                
+                # Completion rate (non-zero scores)
+                completed = (numeric_scores > 0).sum()
+                total_attempts = numeric_scores.notna().sum()
+                completion_rate = completed / max(total_attempts, 1) * 100
+                
+                boulder_completion[f'Boulder {boulder_num}'] = completion_rate
+                boulder_avg_scores[f'Boulder {boulder_num}'] = numeric_scores.mean() if not numeric_scores.isna().all() else 0
+            
+            # Overall performance metrics
+            total_score_col = next((col for col in df.columns if 'Total Score' in str(col)), None)
+            if total_score_col:
+                total_scores = pd.to_numeric(df[total_score_col], errors='coerce')
+                valid_scores = total_scores.dropna()
+                
+                analytics.update({
+                    'boulder_completion_rates': boulder_completion,
+                    'boulder_avg_scores': boulder_avg_scores,
+                    'total_athletes': len(df),
+                    'average_score': valid_scores.mean() if len(valid_scores) > 0 else 0,
+                    'score_std': valid_scores.std() if len(valid_scores) > 0 else 0,
+                    'score_range': [valid_scores.min(), valid_scores.max()] if len(valid_scores) > 0 else [0, 0],
+                    'performance_distribution': valid_scores.tolist() if len(valid_scores) > 0 else []
+                })
+            
+            # Identify most/least difficult boulders
+            if boulder_completion:
+                easiest_boulder = max(boulder_completion.items(), key=lambda x: x[1])
+                hardest_boulder = min(boulder_completion.items(), key=lambda x: x[1])
+                
+                analytics['difficulty_analysis'] = {
+                    'easiest_boulder': f"{easiest_boulder[0]} ({easiest_boulder[1]:.1f}% completion)",
+                    'hardest_boulder': f"{hardest_boulder[0]} ({hardest_boulder[1]:.1f}% completion)",
+                    'difficulty_spread': max(boulder_completion.values()) - min(boulder_completion.values())
+                }
+            
+        except Exception as e:
+            logger.error(f"Error in boulder performance analysis: {e}")
+        
+        return analytics
+    
+    @staticmethod
+    def _analyze_lead_performance(df: pd.DataFrame) -> Dict[str, Any]:
+        """Analyze lead competition performance"""
+        analytics = {}
+        
+        try:
+            if 'Manual Score' not in df.columns:
+                return analytics
+            
+            # Filter active athletes
+            active_df = df[
+                df['Name'].notna() & 
+                (df['Name'] != '') & 
+                (~df['Name'].astype(str).str.contains('Hold for', na=False))
+            ]
+            
+            scores = pd.to_numeric(active_df['Manual Score'], errors='coerce')
+            valid_scores = scores.dropna()
+            
+            if len(valid_scores) == 0:
+                return analytics
+            
+            # Performance metrics
+            analytics.update({
+                'total_athletes': len(active_df),
+                'completed_athletes': len(valid_scores),
+                'completion_rate': len(valid_scores) / len(active_df) * 100,
+                'average_score': valid_scores.mean(),
+                'median_score': valid_scores.median(),
+                'score_std': valid_scores.std(),
+                'score_range': [valid_scores.min(), valid_scores.max()],
+                'performance_distribution': valid_scores.tolist()
+            })
+            
+            # Performance categories
+            if len(valid_scores) >= 3:
+                q25, q75 = valid_scores.quantile([0.25, 0.75])
+                analytics['performance_categories'] = {
+                    'top_performers': (valid_scores >= q75).sum(),
+                    'middle_performers': ((valid_scores >= q25) & (valid_scores < q75)).sum(),
+                    'lower_performers': (valid_scores < q25).sum()
+                }
+            
+        except Exception as e:
+            logger.error(f"Error in lead performance analysis: {e}")
+        
+        return analytics
+
+class VisualizationEngine:
+    """Create visualizations for competition data"""
+    
+    @staticmethod
+    def create_performance_charts(analytics: Dict[str, Any], competition_name: str) -> List[go.Figure]:
+        """Create performance visualization charts"""
+        charts = []
+        
+        try:
+            if "Boulder" in competition_name:
+                charts.extend(VisualizationEngine._create_boulder_charts(analytics, competition_name))
+            elif "Lead" in competition_name:
+                charts.extend(VisualizationEngine._create_lead_charts(analytics, competition_name))
+                
+        except Exception as e:
+            logger.error(f"Error creating charts for {competition_name}: {e}")
+        
+        return charts
+    
+    @staticmethod
+    def _create_boulder_charts(analytics: Dict[str, Any], competition_name: str) -> List[go.Figure]:
+        """Create boulder-specific charts"""
+        charts = []
+        
+        try:
+            # Boulder completion rates chart
+            if 'boulder_completion_rates' in analytics:
+                completion_rates = analytics['boulder_completion_rates']
+                
+                fig = go.Figure(data=[
+                    go.Bar(
+                        x=list(completion_rates.keys()),
+                        y=list(completion_rates.values()),
+                        marker_color=['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4'],
+                        text=[f'{rate:.1f}%' for rate in completion_rates.values()],
+                        textposition='auto'
+                    )
+                ])
+                
+                fig.update_layout(
+                    title=f'{competition_name} - Boulder Completion Rates',
+                    xaxis_title='Boulder',
+                    yaxis_title='Completion Rate (%)',
+                    template='plotly_white',
+                    height=400
+                )
+                
+                charts.append(fig)
+            
+            # Performance distribution histogram
+            if 'performance_distribution' in analytics and analytics['performance_distribution']:
+                scores = analytics['performance_distribution']
+                
+                fig = go.Figure(data=[
+                    go.Histogram(
+                        x=scores,
+                        nbinsx=15,
+                        marker_color='#4ecdc4',
+                        opacity=0.7
+                    )
+                ])
+                
+                fig.update_layout(
+                    title=f'{competition_name} - Score Distribution',
+                    xaxis_title='Total Score',
+                    yaxis_title='Number of Athletes',
+                    template='plotly_white',
+                    height=400
+                )
+                
+                charts.append(fig)
+            
+        except Exception as e:
+            logger.error(f"Error creating boulder charts: {e}")
+        
+        return charts
+    
+    @staticmethod
+    def _create_lead_charts(analytics: Dict[str, Any], competition_name: str) -> List[go.Figure]:
+        """Create lead-specific charts"""
+        charts = []
+        
+        try:
+            # Performance categories pie chart
+            if 'performance_categories' in analytics:
+                categories = analytics['performance_categories']
+                
+                fig = go.Figure(data=[
+                    go.Pie(
+                        labels=['Top Performers', 'Middle Performers', 'Lower Performers'],
+                        values=[categories['top_performers'], categories['middle_performers'], categories['lower_performers']],
+                        marker_colors=['#28a745', '#ffc107', '#dc3545'],
+                        hole=0.4
+                    )
+                ])
+                
+                fig.update_layout(
+                    title=f'{competition_name} - Performance Categories',
+                    template='plotly_white',
+                    height=400
+                )
+                
+                charts.append(fig)
+            
+            # Score distribution
+            if 'performance_distribution' in analytics and analytics['performance_distribution']:
+                scores = analytics['performance_distribution']
+                
+                # Box plot
+                fig = go.Figure()
+                
+                fig.add_trace(go.Box(
+                    y=scores,
+                    name='Scores',
+                    marker_color='#45b7d1',
+                    boxmean='sd'
+                ))
+                
+                fig.update_layout(
+                    title=f'{competition_name} - Score Distribution',
+                    yaxis_title='Score',
+                    template='plotly_white',
+                    height=400
+                )
+                
+                charts.append(fig)
+            
+        except Exception as e:
+            logger.error(f"Error creating lead charts: {e}")
+        
+        return charts
+
+class InsightGenerator:
+    """Generate insights from competition data"""
+    
+    @staticmethod
+    def generate_insights(analytics: Dict[str, Any], competition_name: str) -> List[str]:
+        """Generate human-readable insights from analytics"""
+        insights = []
+        
+        try:
+            if "Boulder" in competition_name:
+                insights.extend(InsightGenerator._generate_boulder_insights(analytics, competition_name))
+            elif "Lead" in competition_name:
+                insights.extend(InsightGenerator._generate_lead_insights(analytics, competition_name))
+            
+        except Exception as e:
+            logger.error(f"Error generating insights for {competition_name}: {e}")
+        
+        return insights
+    
+    @staticmethod
+    def _generate_boulder_insights(analytics: Dict[str, Any], competition_name: str) -> List[str]:
+        """Generate boulder-specific insights"""
+        insights = []
+        
+        try:
+            # Difficulty analysis
+            if 'difficulty_analysis' in analytics:
+                difficulty = analytics['difficulty_analysis']
+                if 'easiest_boulder' in difficulty and 'hardest_boulder' in difficulty:
+                    insights.append(f"🎯 **Boulder Difficulty**: {difficulty['easiest_boulder']} was the easiest, while {difficulty['hardest_boulder']} proved most challenging.")
+                
+                if 'difficulty_spread' in difficulty:
+                    spread = difficulty['difficulty_spread']
+                    if spread > 40:
+                        insights.append(f"⚡ **Route Setting**: Large difficulty spread ({spread:.1f}%) indicates varied problem difficulty.")
+                    elif spread < 15:
+                        insights.append(f"🎯 **Route Setting**: Consistent difficulty across problems ({spread:.1f}% spread).")
+            
+            # Performance insights
+            if 'average_score' in analytics and 'score_std' in analytics:
+                avg_score = analytics['average_score']
+                std_score = analytics['score_std']
+                
+                if std_score > 0:
+                    cv = std_score / avg_score * 100  # Coefficient of variation
+                    if cv > 30:
+                        insights.append(f"📊 **Performance Spread**: High score variation ({cv:.1f}%) suggests competitive field with clear skill gaps.")
+                    elif cv < 15:
+                        insights.append(f"🏁 **Close Competition**: Low score variation ({cv:.1f}%) indicates very competitive field.")
+            
+            # Completion rate analysis
+            if 'boulder_completion_rates' in analytics:
+                rates = list(analytics['boulder_completion_rates'].values())
+                if rates:
+                    avg_completion = sum(rates) / len(rates)
+                    if avg_completion > 70:
+                        insights.append(f"✅ **High Success Rate**: Average {avg_completion:.1f}% completion suggests achievable difficulty level.")
+                    elif avg_completion < 30:
+                        insights.append(f"💪 **Challenging Set**: Average {avg_completion:.1f}% completion indicates very difficult problems.")
+            
+        except Exception as e:
+            logger.error(f"Error generating boulder insights: {e}")
+        
+        return insights
+    
+    @staticmethod
+    def _generate_lead_insights(analytics: Dict[str, Any], competition_name: str) -> List[str]:
+        """Generate lead-specific insights"""
+        insights = []
+        
+        try:
+            # Completion rate insights
+            if 'completion_rate' in analytics:
+                completion_rate = analytics['completion_rate']
+                if completion_rate > 80:
+                    insights.append(f"🚀 **Competition Progress**: {completion_rate:.1f}% of athletes have completed their climbs - competition nearly finished!")
+                elif completion_rate > 50:
+                    insights.append(f"⏳ **Competition Progress**: {completion_rate:.1f}% completed - competition is well underway.")
+                elif completion_rate > 20:
+                    insights.append(f"🏁 **Early Stage**: {completion_rate:.1f}% completed - competition is in early stages.")
+            
+            # Performance spread analysis
+            if 'average_score' in analytics and 'score_std' in analytics and 'score_range' in analytics:
+                avg_score = analytics['average_score']
+                std_score = analytics['score_std']
+                score_range = analytics['score_range']
+                
+                range_span = score_range[1] - score_range[0]
+                if range_span > 30 and std_score > 0:
+                    insights.append(f"📈 **Score Distribution**: Wide scoring range ({score_range[0]:.1f}-{score_range[1]:.1f}) shows varied performance levels.")
+                
+                if std_score > 10:
+                    insights.append(f"⚡ **Competitive Spread**: High score variation ({std_score:.1f}) indicates significant performance differences.")
+            
+            # Performance categories
+            if 'performance_categories' in analytics:
+                categories = analytics['performance_categories']
+                total = sum(categories.values())
+                if total > 0:
+                    top_pct = categories['top_performers'] / total * 100
+                    if top_pct < 20:
+                        insights.append(f"🏆 **Elite Performance**: Only {top_pct:.0f}% of athletes in top performance tier - highly competitive field.")
+                    elif top_pct > 35:
+                        insights.append(f"📊 **Accessible Route**: {top_pct:.0f}% in top tier suggests route is achievable for skilled climbers.")
+            
+        except Exception as e:
+            logger.error(f"Error generating lead insights: {e}")
+        
+        return insights
+
+# FIXED ATHLETE STATUS DETERMINATION - Key fix for worst finish logic
+def determine_athlete_status_enhanced(rank: any, total_score: any, boulder_info: Dict, 
+                                    competition_name: str, row_data: pd.Series = None) -> Tuple[str, str]:
+    """Enhanced athlete status determination with FIXED worst finish logic"""
+    try:
+        rank_num = DataProcessor.safe_numeric_conversion(rank)
+        completed_boulders = boulder_info.get('completed_boulders', 0)
+        
+        # If no valid rank, return awaiting result
+        if rank_num <= 0:
+            return "awaiting-result", "⏳"
+        
+        # Boulder Semifinals logic - FIXED for worst finish
+        if "Boulder" in competition_name and "Semis" in competition_name:
+            if completed_boulders < 4:
+                # Still competing - yellow for everyone still climbing
+                return "podium-contention", "⚠️"
+            else:
+                # All 4 boulders completed - check position and worst finish
+                if rank_num <= 8:
+                    # Look for worst finish in row data
+                    worst_finish_num = None
+                    
+                    if row_data is not None:
+                        # Try to find worst finish column
+                        worst_finish_col = next((
+                            col for col in row_data.index 
+                            if 'worst' in str(col).lower() and 'finish' in str(col).lower()
+                        ), None)
+                        
+                        if worst_finish_col:
+                            worst_finish_value = row_data.get(worst_finish_col)
+                            if pd.notna(worst_finish_value) and str(worst_finish_value) not in ['', 'N/A', '-']:
+                                try:
+                                    worst_finish_num = float(str(worst_finish_value).strip())
+                                except (ValueError, TypeError):
+                                    worst_finish_num = None
+                    
+                    # CRITICAL LOGIC: If in top 8 but worst finish > 8, show yellow (could be eliminated)
+                    if worst_finish_num is not None and worst_finish_num > 8:
+                        return "podium-contention", "⚠️"  # Yellow - at risk of elimination
+                    else:
+                        return "qualified", "✅"  # Green - safely qualified
+                else:
+                    return "eliminated", "❌"  # Red - eliminated
+        
+        # Boulder Finals logic
+        elif "Boulder" in competition_name and "Final" in competition_name:
+            if completed_boulders < 4:
+                if rank_num <= 3 and completed_boulders >= 2:
+                    return "podium-position", "🏆"
+                else:
+                    return "podium-contention", "⚠️"
+            else:
+                if rank_num <= 3:
+                    return "podium-position", "🏆"
+                else:
+                    return "no-podium", "❌"
+        
+        # Lead competitions logic
+        elif "Lead" in competition_name:
+            if "Semis" in competition_name:
+                if rank_num <= 8:
+                    return "qualified", "✅"
+                else:
+                    return "eliminated", "❌"
+            elif "Final" in competition_name:
+                if rank_num <= 3:
+                    return "podium-position", "🏆"
+                else:
+                    return "no-podium", "❌"
+        
+        # Default fallback
+        if rank_num <= 3:
+            return "podium-position", "🏆"
+        elif rank_num <= 8:
+            return "qualified", "✅"
+        else:
+            return "eliminated", "❌"
+            
+    except Exception as e:
+        logger.warning(f"Error determining status: {e}")
+        return "awaiting-result", "⏳"
+
+def determine_lead_athlete_status(status: str, has_score: bool, rank: any = None) -> Tuple[str, str]:
+    """Enhanced lead athlete status determination"""
+    if not has_score:
+        return "awaiting-result", "📄"
+    
+    # Convert rank for additional context
+    rank_num = DataProcessor.safe_numeric_conversion(rank) if rank else 0
+    status_lower = str(status).lower()
+    
+    # Priority-based status determination
+    if "podium" in status_lower and "no podium" not in status_lower:
+        return "podium-position", "🏆"
+    elif "qualified" in status_lower:
+        return "qualified", "✅"
+    elif "eliminated" in status_lower:
+        return "eliminated", "❌"
+    elif "no podium" in status_lower:
+        return "no-podium", "❌"
+    elif "contention" in status_lower:
+        return "podium-contention", "⚠️"
+    
+    # Fallback to rank-based determination
+    if rank_num > 0:
+        if rank_num <= 3:
+            return "podium-position", "🏆"
+        elif rank_num <= 8:
+            return "qualified", "✅"
+        else:
+            return "eliminated", "❌"
+    
+    return "podium-contention", "📊"
+
+def calculate_boulder_completion_enhanced(row: pd.Series) -> Dict[str, any]:
+    """Enhanced boulder completion calculation with worst finish handling"""
+    boulder_scores = []
+    completed_boulders = 0
+    
+    for i in range(1, 5):
+        col_name = f'Boulder {i} Score (0-25)'
+        if col_name in row.index:
+            score = row.get(col_name, '-')
+            if pd.notna(score) and str(score) != '-' and str(score) != '':
+                boulder_scores.append(f"B{i}: {score}")
+                completed_boulders += 1
+            else:
+                boulder_scores.append(f"B{i}: -")
+    
+    boulder_display = " | ".join(boulder_scores) if boulder_scores else "No boulder data"
+    
+    # Enhanced worst finish handling
+    worst_finish_display = ""
+    worst_finish_value = None
+    
+    if completed_boulders == 4:
+        worst_finish_col = next((
+            col for col in row.index 
+            if 'worst' in str(col).lower() and 'finish' in str(col).lower()
+        ), None)
+        
+        if worst_finish_col:
+            worst_finish_raw = row.get(worst_finish_col, 'N/A')
+            if worst_finish_raw not in ['N/A', '', None] and not pd.isna(worst_finish_raw):
+                worst_finish_clean = DataProcessor.clean_text(str(worst_finish_raw))
+                if worst_finish_clean and worst_finish_clean != '-':
+                    worst_finish_display = f" | Worst Finish: {worst_finish_clean}"
+                    # Store numeric value for logic
+                    try:
+                        worst_finish_value = float(worst_finish_clean)
+                    except (ValueError, TypeError):
+                        worst_finish_value = None
+    
+    return {
+        'boulder_scores': boulder_scores,
+        'completed_boulders': completed_boulders,
+        'boulder_display': boulder_display,
+        'worst_finish_display': worst_finish_display,
+        'worst_finish_numeric': worst_finish_value  # NEW: numeric value for logic
+    }
+
+def create_strategy_display(row: pd.Series, boulder_info: Dict, competition_name: str) -> str:
+    """Create strategy display for boulder competitions"""
+    strategy_display = ""
+    completed_boulders = boulder_info['completed_boulders']
+    
+    if ("Semis" in competition_name or "Final" in competition_name) and completed_boulders == 3:
+        strategy_cols = {}
+        for col in row.index:
+            col_str = str(col)
+            if '1st Place Strategy' in col_str:
+                strategy_cols['1st'] = col
+            elif '2nd Place Strategy' in col_str:
+                strategy_cols['2nd'] = col
+            elif '3rd Place Strategy' in col_str:
+                strategy_cols['3rd'] = col
+            elif 'Points Needed for Top 8' in col_str:
+                strategy_cols['top8'] = col
+        
+        if strategy_cols:
+            strategies = []
+            
+            for place, col in strategy_cols.items():
+                strategy_value = row.get(col, '')
+                if strategy_value and str(strategy_value) not in ['', 'nan', 'N/A']:
+                    strategy_clean = DataProcessor.clean_text(str(strategy_value))
+                    if strategy_clean:
+                        if place == '1st':
+                            strategies.append(f"🥇 1st: {strategy_clean}")
+                        elif place == '2nd':
+                            strategies.append(f"🥈 2nd: {strategy_clean}")
+                        elif place == '3rd':
+                            strategies.append(f"🥉 3rd: {strategy_clean}")
+                        elif place == 'top8' and "Semis" in competition_name:
+                            strategies.append(f"🎯 Top 8: {strategy_clean}")
+            
+            if strategies:
+                comp_type = "Final" if "Final" in competition_name else "Semi"
+                strategy_display = f"<br><div class='targets'><strong>{comp_type} Strategy:</strong> {' | '.join(strategies)}</div>"
+    
+    return strategy_display
+
+def create_athlete_card_enhanced(position_emoji: str, athlete: str, total_score: any, 
+                               boulder_info: Dict, strategy_display: str, card_class: str):
+    """Create and display an enhanced athlete card"""
+    completed_boulders = boulder_info['completed_boulders']
+    boulder_display = boulder_info['boulder_display']
+    worst_finish_display = boulder_info['worst_finish_display']
+    
+    # Ensure card_class is never empty
+    if not card_class or card_class.strip() == "":
+        card_class = "awaiting-result"
+    
+    # Create detail text based on completion status
+    if completed_boulders == 4:
+        detail_text = f"Total: {total_score} | {boulder_display}{worst_finish_display}"
+    elif completed_boulders == 3:
+        detail_text = f"Total: {total_score} | {boulder_display} | 1 boulder remaining"
+    else:
+        detail_text = f"Total: {total_score} | {boulder_display} | Progress: {completed_boulders}/4"
+    
+    st.markdown(f"""
+    <div class="athlete-row {card_class}">
+        <strong>{position_emoji} - {athlete}</strong><br>
+        <small>{detail_text}</small>{strategy_display}
+    </div>
+    """, unsafe_allow_html=True)
+
 def display_enhanced_metrics(df: pd.DataFrame, competition_name: str):
     """Display enhanced metrics with progress indicators"""
     col1, col2, col3, col4 = st.columns(4)
@@ -603,7 +1465,7 @@ def display_enhanced_metrics(df: pd.DataFrame, competition_name: str):
                 <h2>{metrics["avg_score"]:.1f}</h2>
             </div>
             ''', unsafe_allow_html=True)
-        
+           
         with col4:
             st.markdown(f'''
             <div class="metric-card">
@@ -611,728 +1473,40 @@ def display_enhanced_metrics(df: pd.DataFrame, competition_name: str):
                 <h2>{metrics["leader"][:15]}{"..." if len(metrics["leader"]) > 15 else ""}</h2>
             </div>
             ''', unsafe_allow_html=True)
-
-def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str) -> Tuple[str, str]:
-    """Determine athlete status and appropriate styling - FIXED"""
-    try:
-        rank_num = DataProcessor.safe_numeric_conversion(rank)
-        completed_boulders = boulder_info['completed_boulders']
-        worst_finish_display = boulder_info['worst_finish_display']
+    
+    elif "Lead" in competition_name:
+        metrics = MetricsCalculator.calculate_lead_metrics(df)
         
-        # If no valid rank, return gray
-        if rank_num <= 0:
-            return "awaiting-result", "⏳"
-        
-        # FIXED LOGIC - Always returns valid CSS classes
-        if "Boulder" in competition_name and "Semis" in competition_name:
-            if completed_boulders < 4:
-                # Still competing - yellow for everyone
-                return "podium-contention", "⚠️"
-            elif rank_num <= 8:
-                return "qualified", "✅"  # GREEN
-            else:
-                return "eliminated", "❌"  # RED
-        
-        elif "Boulder" in competition_name and "Final" in competition_name:
-            if completed_boulders < 4:
-                # Still competing - yellow for everyone
-                return "podium-contention", "⚠️"
-            elif rank_num <= 3:
-                return "podium-position", "🏆"  # GREEN
-            else:
-                return "no-podium", "❌"  # RED
-        
-        # Default for all other cases
-        else:
-            if rank_num <= 3:
-                return "podium-position", "🏆"  # GREEN
-            elif rank_num <= 8:
-                return "qualified", "✅"  # GREEN
-            else:
-                return "eliminated", "❌"  # RED
-            
-    except Exception as e:
-        logger.warning(f"Error: {e}")
-        return "awaiting-result", "⏳"
-
-def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, str]:
-    """Determine lead athlete status - FIXED"""
-    if not has_score:
-        return "awaiting-result", "📄"
-    
-    status_lower = str(status).lower()
-    
-    if "qualified" in status_lower:
-        return "qualified", "✅"
-    elif "eliminated" in status_lower:
-        return "eliminated", "❌"
-    elif "podium" in status_lower and "no podium" not in status_lower:
-        return "podium-position", "🏆"
-    elif "contention" in status_lower:
-        return "podium-contention", "⚠️"
-    elif "no podium" in status_lower:
-        return "no-podium", "❌"
-    else:
-        return "podium-contention", "📊"
-
-def main():
-    """Enhanced main application function"""
-    
-    # Initialize session state
-    if 'last_refresh' not in st.session_state:
-        st.session_state.last_refresh = datetime.now()
-    if 'auto_refresh_enabled' not in st.session_state:
-        st.session_state.auto_refresh_enabled = True
-    if 'selected_competitions' not in st.session_state:
-        st.session_state.selected_competitions = []
-    
-    # Enhanced header
-    st.markdown("""
-    <div class="main-header">
-        <h1>🧗‍♂️ IFSC 2025 World Championships</h1>
-        <h3>Live Competition Results Dashboard</h3>
-        <p style="margin: 0; opacity: 0.9;">Real-time climbing competition tracking</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Enhanced sidebar
-    st.sidebar.title("🎯 Dashboard Controls")
-    
-    # Auto-refresh section
-    with st.sidebar.expander("🔄 Refresh Settings", expanded=True):
-        auto_refresh = st.checkbox(
-            "Enable Auto-Refresh", 
-            value=st.session_state.auto_refresh_enabled,
-            help=f"Updates every {Config.AUTO_REFRESH_INTERVAL}s"
-        )
-        st.session_state.auto_refresh_enabled = auto_refresh
-        
-        col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔄 Refresh", type="primary", use_container_width=True):
-                st.cache_data.clear()
-                st.session_state.last_refresh = datetime.now()
-                st.success("✅ Refreshed!")
-                time.sleep(0.5)
-                st.rerun()
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>👥 Athletes</h4>
+                <h2>{metrics["total_athletes"]}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
         
         with col2:
-            if st.button("🗑️ Clear Cache", use_container_width=True):
-                st.cache_data.clear()
-                st.success("✅ Cache cleared!")
-        
-        # Show refresh status
-        time_since = (datetime.now() - st.session_state.last_refresh).seconds
-        st.caption(f"🕒 Last refresh: {time_since}s ago")
-    
-    # Competition filters
-    with st.sidebar.expander("🎯 Competition Filters", expanded=True):
-        competition_type = st.selectbox(
-            "⛰️ Discipline",
-            ["All", "Boulder", "Lead"],
-            help="Filter by climbing discipline"
-        )
-        
-        gender_filter = st.selectbox(
-            "👤 Gender",
-            ["All", "Male", "Female"],
-            help="Filter by gender category"
-        )
-        
-        round_filter = st.selectbox(
-            "🎯 Round",
-            ["All", "Semis", "Final"],
-            help="Filter by competition round"
-        )
-    
-    # Filter competitions
-    filtered_competitions = get_filtered_competitions(competition_type, gender_filter, round_filter)
-    
-    if not filtered_competitions:
-        st.markdown("""
-        <div class="error-card">
-            <h3>⚠️ No Competitions Found</h3>
-            <p>No competitions match your current filters. Please adjust your selection.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        return
-    
-    # Competition overview
-    st.markdown("### 🚀 Competition Overview")
-    
-    # Calculate overview metrics with progress
-    overview_metrics = calculate_overview_metrics(filtered_competitions)
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h4>🏆 Total</h4>
-            <h2>{overview_metrics["total"]}</h2>
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h4>🔴 Live</h4>
-            <h2>{overview_metrics["live"]}</h2>
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h4>✅ Completed</h4>
-            <h2>{overview_metrics["completed"]}</h2>
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h4>📄 Upcoming</h4>
-            <h2>{overview_metrics["upcoming"]}</h2>
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    # Display results
-    st.markdown("### 📊 Live Results")
-    
-    if len(filtered_competitions) > 1:
-        # Create tabs for multiple competitions
-        tab_names = list(filtered_competitions.keys())
-        tabs = st.tabs(tab_names)
-        
-        for i, (comp_name, url) in enumerate(filtered_competitions.items()):
-            with tabs[i]:
-                display_competition_results(comp_name, url)
-    else:
-        # Single competition view
-        comp_name, url = list(filtered_competitions.items())[0]
-        display_competition_results(comp_name, url)
-    
-    # Enhanced footer
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("**⛰️ IFSC World Championships 2025**")
-    with col2:
-        st.markdown("**📊 Real-time Results**")
-    with col3:
-        st.markdown(f"**🔄 Auto-refresh: {'ON' if st.session_state.auto_refresh_enabled else 'OFF'}**")
-    
-    # Auto-refresh logic
-    if st.session_state.auto_refresh_enabled:
-        time_since_last = (datetime.now() - st.session_state.last_refresh).total_seconds()
-        if time_since_last >= Config.AUTO_REFRESH_INTERVAL:
-            st.session_state.last_refresh = datetime.now()
-            st.rerun()
-
-
-def get_filtered_competitions(competition_type: str, gender_filter: str, round_filter: str) -> Dict[str, str]:
-    """Get filtered competitions based on user selection"""
-    filtered_competitions = {}
-    
-    for name, url in Config.SHEETS_URLS.items():
-        include = True
-        
-        if competition_type != "All" and competition_type.lower() not in name.lower():
-            include = False
-        
-        if gender_filter != "All" and gender_filter.lower() not in name.lower():
-            include = False
-                
-        if round_filter != "All" and round_filter.lower() not in name.lower():
-            include = False
-        
-        if include:
-            filtered_competitions[name] = url
-    
-    return filtered_competitions
-
-
-def calculate_overview_metrics(filtered_competitions: Dict[str, str]) -> Dict[str, int]:
-    """Calculate overview metrics for all competitions"""
-    metrics = {"total": 0, "live": 0, "completed": 0, "upcoming": 0}
-    
-    for comp_name, url in filtered_competitions.items():
-        try:
-            df = DataLoader.load_sheet_data(url)
-            status, _ = CompetitionStatusDetector.get_competition_status(df, comp_name)
-            metrics["total"] += 1
-            metrics[status] += 1
-        except Exception as e:
-            logger.warning(f"Error calculating metrics for {comp_name}: {e}")
-            metrics["total"] += 1
-            metrics["upcoming"] += 1
-    
-    return metrics
-
-
-def display_competition_results(comp_name: str, url: str):
-    """Display results for a single competition"""
-    with st.spinner(f"Loading {comp_name}..."):
-        df = DataLoader.load_sheet_data(url)
-    
-    current_time = datetime.now().strftime("%H:%M:%S")
-    st.caption(f"📡 Last updated: {current_time}")
-    
-    if "Boulder" in comp_name:
-        display_boulder_results(df, comp_name)
-    elif "Lead" in comp_name:
-        display_lead_results(df, comp_name)
-    else:
-        if not df.empty:
-            st.dataframe(df, use_container_width=True, hide_index=True)
-        else:
-            st.markdown('<div class="error-card">⚠️ No data available</div>', unsafe_allow_html=True)
-
-
-def display_boulder_results(df: pd.DataFrame, competition_name: str):
-    """Enhanced boulder competition results display"""
-    status, status_emoji = CompetitionStatusDetector.get_competition_status(df, competition_name)
-    status_class = f"badge-{status}"
-    
-    st.markdown(f"""
-    ### 🪨 {competition_name} 
-    <span class="status-badge {status_class}">{status_emoji} {status.upper()}</span>
-    """, unsafe_allow_html=True)
-    
-    if df.empty:
-        st.markdown('<div class="error-card">⚠️ No data available for this competition</div>', unsafe_allow_html=True)
-        return
-    
-    # Validate required columns
-    required_cols = ['Athlete Name', 'Current Position/Rank']
-    is_valid, issues = DataProcessor.validate_dataframe(df, required_cols)
-    
-    if not is_valid:
-        st.markdown(f'<div class="error-card">⚠️ Data validation failed: {"; ".join(issues)}</div>', unsafe_allow_html=True)
-        with st.expander("🔍 Raw Data"):
-            st.dataframe(df, use_container_width=True, hide_index=True)
-        return
-    
-    # Display enhanced metrics
-    display_enhanced_metrics(df, competition_name)
-    
-    st.markdown("#### 📋 Current Standings")
-    
-    # Find the total score column
-    score_col = next((col for col in df.columns if 'Total Score' in str(col)), None)
-    
-    # Sort and prepare data
-    df_sorted = df.copy()
-    
-    # Convert rank to numeric
-    if 'Current Position/Rank' in df.columns:
-        df_sorted['Current Position/Rank'] = pd.to_numeric(df_sorted['Current Position/Rank'], errors='coerce')
-    
-    # Convert score to numeric if available
-    if score_col is not None:
-        df_sorted[score_col] = pd.to_numeric(df_sorted[score_col], errors='coerce')
-    
-    # Sort by position
-    try:
-        if 'Current Position/Rank' in df_sorted.columns:
-            df_sorted = df_sorted.sort_values('Current Position/Rank', ascending=True).reset_index(drop=True)
-        elif score_col is not None:
-            df_sorted = df_sorted.sort_values(score_col, ascending=False).reset_index(drop=True)
-    except Exception as e:
-        logger.warning(f"Could not sort data: {e}")
-        df_sorted = df.copy()
-    
-    # Display results with enhanced athlete cards
-    display_boulder_athlete_cards(df_sorted, score_col, competition_name)
-
-
-def display_boulder_athlete_cards(df_sorted: pd.DataFrame, score_col: Optional[str], competition_name: str):
-    """Display enhanced athlete cards for boulder competitions"""
-    
-    for idx, row in df_sorted.iterrows():
-        if pd.isna(row.get('Athlete Name')) or row.get('Athlete Name') == '':
-            continue
-            
-        rank = row.get('Current Position/Rank', 'N/A')
-        athlete = DataProcessor.clean_text(str(row.get('Athlete Name', 'Unknown')))
-        total_score = row.get(score_col, 'N/A') if score_col else 'N/A'
-        
-        # Calculate boulder completion
-        boulder_info = calculate_boulder_completion(row)
-        
-        # Determine athlete status and styling
-        card_class, position_emoji = determine_athlete_status(
-            rank, total_score, boulder_info, competition_name
-        )
-        
-        # Create strategy display if applicable
-        strategy_display = create_strategy_display(row, boulder_info, competition_name)
-        
-        # Create the athlete card
-        create_athlete_card(
-            position_emoji, athlete, total_score, boulder_info, 
-            strategy_display, card_class
-        )
-
-
-def calculate_boulder_completion(row: pd.Series) -> Dict[str, any]:
-    """Calculate boulder completion information for an athlete"""
-    boulder_scores = []
-    completed_boulders = 0
-    
-    for i in range(1, 5):
-        col_name = f'Boulder {i} Score (0-25)'
-        if col_name in row.index:
-            score = row.get(col_name, '-')
-            if pd.notna(score) and str(score) != '-' and str(score) != '':
-                boulder_scores.append(f"B{i}: {score}")
-                completed_boulders += 1
-            else:
-                boulder_scores.append(f"B{i}: -")
-    
-    boulder_display = " | ".join(boulder_scores) if boulder_scores else "No boulder data"
-    
-    # Check for worst finish information
-    worst_finish_display = ""
-    if completed_boulders == 4:
-        worst_finish_col = next((
-            col for col in row.index 
-            if 'worst' in str(col).lower() and 'finish' in str(col).lower()
-        ), None)
-        
-        if worst_finish_col:
-            worst_finish = row.get(worst_finish_col, 'N/A')
-            if worst_finish not in ['N/A', '', None] and not pd.isna(worst_finish):
-                worst_finish_clean = DataProcessor.clean_text(str(worst_finish))
-                if worst_finish_clean and worst_finish_clean != '-':
-                    worst_finish_display = f" | Worst Finish: {worst_finish_clean}"
-    
-    return {
-        'boulder_scores': boulder_scores,
-        'completed_boulders': completed_boulders,
-        'boulder_display': boulder_display,
-        'worst_finish_display': worst_finish_display
-    }
-
-
-def create_strategy_display(row: pd.Series, boulder_info: Dict, competition_name: str) -> str:
-    """Create strategy display for boulder competitions"""
-    strategy_display = ""
-    completed_boulders = boulder_info['completed_boulders']
-    
-    if ("Semis" in competition_name or "Final" in competition_name) and completed_boulders == 3:
-        strategy_cols = {}
-        for col in row.index:
-            col_str = str(col)
-            if '1st Place Strategy' in col_str:
-                strategy_cols['1st'] = col
-            elif '2nd Place Strategy' in col_str:
-                strategy_cols['2nd'] = col
-            elif '3rd Place Strategy' in col_str:
-                strategy_cols['3rd'] = col
-            elif 'Points Needed for Top 8' in col_str:
-                strategy_cols['top8'] = col
-        
-        if strategy_cols:
-            strategies = []
-            has_impossible_top8 = False
-            
-            for place, col in strategy_cols.items():
-                strategy_value = row.get(col, '')
-                if strategy_value and str(strategy_value) not in ['', 'nan', 'N/A']:
-                    strategy_clean = DataProcessor.clean_text(str(strategy_value))
-                    if strategy_clean:
-                        if place == '1st':
-                            strategies.append(f"🥇 1st: {strategy_clean}")
-                        elif place == '2nd':
-                            strategies.append(f"🥈 2nd: {strategy_clean}")
-                        elif place == '3rd':
-                            strategies.append(f"🥉 3rd: {strategy_clean}")
-                        elif place == 'top8' and "Semis" in competition_name:
-                            strategies.append(f"🎯 Top 8: {strategy_clean}")
-                            if "IMPOSSIBLE" in strategy_clean.upper():
-                                has_impossible_top8 = True
-            
-            if strategies:
-                comp_type = "Final" if "Final" in competition_name else "Semi"
-                strategy_display = f"<br><div class='targets'><strong>{comp_type} Strategy:</strong> {' | '.join(strategies)}</div>"
-                
-                if has_impossible_top8 and "Semis" in competition_name:
-                    return strategy_display, "eliminated"
-    
-    return strategy_display
-
-
-def create_athlete_card(position_emoji: str, athlete: str, total_score: any, 
-                       boulder_info: Dict, strategy_display: str, card_class: str):
-    """Create and display an athlete card"""
-    completed_boulders = boulder_info['completed_boulders']
-    boulder_display = boulder_info['boulder_display']
-    worst_finish_display = boulder_info['worst_finish_display']
-    
-    # Ensure card_class is never empty
-    if not card_class or card_class.strip() == "":
-        card_class = "awaiting-result"
-    
-    # Check if strategy display indicates impossible Top 8
-    if isinstance(strategy_display, tuple):
-        strategy_display, override_class = strategy_display
-        if override_class == "eliminated":
-            card_class = "eliminated"
-            position_emoji = "❌"
-    
-    # Create detail text based on completion status
-    if completed_boulders == 4:
-        detail_text = f"Total: {total_score} | {boulder_display}{worst_finish_display}"
-    elif completed_boulders == 3:
-        detail_text = f"Total: {total_score} | {boulder_display} | 1 boulder remaining"
-    else:
-        detail_text = f"Total: {total_score} | {boulder_display} | Progress: {completed_boulders}/4"
-    
-    st.markdown(f"""
-    <div class="athlete-row {card_class}">
-        <strong>{position_emoji} - {athlete}</strong><br>
-        <small>{detail_text}</small>{strategy_display}
-    </div>
-    """, unsafe_allow_html=True)
-
-
-def display_lead_results(df: pd.DataFrame, competition_name: str):
-    """Enhanced lead competition results display"""
-    status, status_emoji = CompetitionStatusDetector.get_competition_status(df, competition_name)
-    status_class = f"badge-{status}"
-    
-    st.markdown(f"""
-    ### 🧗‍♀️ {competition_name}
-    <span class="status-badge {status_class}">{status_emoji} {status.upper()}</span>
-    """, unsafe_allow_html=True)
-    
-    if df.empty:
-        st.markdown('<div class="error-card">⚠️ No data available for this competition</div>', unsafe_allow_html=True)
-        return
-    
-    if 'Name' not in df.columns:
-        st.markdown('<div class="error-card">⚠️ Name column not found in data</div>', unsafe_allow_html=True)
-        return
-    
-    # Extract qualification info and filter active athletes
-    qualification_info = extract_qualification_info(df)
-    active_df = filter_active_athletes(df, competition_name)
-    
-    # Display enhanced metrics
-    display_enhanced_metrics(active_df, competition_name)
-    
-    st.markdown("#### 📋 Current Standings")
-    
-    # Show qualification thresholds
-    display_qualification_thresholds(qualification_info)
-    
-    # Sort and display athletes
-    display_lead_athletes(active_df, qualification_info)
-
-
-def extract_qualification_info(df: pd.DataFrame) -> Dict[str, str]:
-    """Extract qualification threshold information from dataframe"""
-    qualification_info = {}
-    try:
-        threshold_cols = ['Hold for 1st', 'Hold for 2nd', 'Hold for 3rd', 'Hold to Qualify', 'Min to Qualify']
-        for _, row in df.iterrows():
-            if pd.isna(row.get('Name')) or row.get('Name') == '':
-                continue
-            for col in threshold_cols:
-                if col in df.columns and pd.notna(row.get(col)):
-                    qualification_info[col] = DataProcessor.clean_text(str(row.get(col)))
-    except Exception as e:
-        logger.warning(f"Error extracting qualification thresholds: {e}")
-    return qualification_info
-
-
-def filter_active_athletes(df: pd.DataFrame, competition_name: str) -> pd.DataFrame:
-    """Filter out reference rows to get only active athletes"""
-    try:
-        active_df = df[
-            df['Name'].notna() & 
-            (df['Name'] != '') & 
-            (~df['Name'].astype(str).str.isdigit()) &
-            (~df['Name'].astype(str).str.contains('Hold for', na=False)) &
-            (~df['Name'].astype(str).str.contains('Min to', na=False)) &
-            (~df['Name'].astype(str).str.contains('TBD|TBA|Qualification|Threshold|Zone|Top', na=False, case=False)) &
-            (~df['Name'].astype(str).str.startswith(('Hold', 'Min', '#'), na=False)) &
-            (~df['Name'].apply(is_placeholder_athlete))
-        ]
-        
-        # Set expected athlete counts based on competition type
-        if "Lead Semis" in competition_name:
-            expected_max = 24
-        elif "Boulder Semis" in competition_name:
-            expected_max = 20
-        elif "Final" in competition_name:
-            expected_max = 8
-        else:
-            expected_max = 999
-        
-        if "Lead Semis" in competition_name:
-            if len(active_df) >= 24:
-                active_df = active_df.head(24)
-                logger.info(f"{competition_name}: Using first 24 athletes")
-            else:
-                logger.warning(f"{competition_name}: Only found {len(active_df)} athletes, expected 24")
-        
-        elif expected_max < 999 and len(active_df) > expected_max and 'Current Rank' in active_df.columns:
-            active_df['temp_rank'] = pd.to_numeric(active_df['Current Rank'], errors='coerce')
-            
-            rank_filtered = active_df[
-                (active_df['temp_rank'].notna()) & 
-                (active_df['temp_rank'] >= 1) & 
-                (active_df['temp_rank'] <= expected_max)
-            ]
-            
-            if len(rank_filtered) == expected_max:
-                active_df = rank_filtered.drop('temp_rank', axis=1)
-            else:
-                active_df = active_df.drop('temp_rank', axis=1).head(expected_max)
-        
-        elif expected_max < 999 and len(active_df) > expected_max:
-            active_df = active_df.head(expected_max)
-        
-        return active_df
-        
-    except Exception as e:
-        logger.error(f"Error filtering athletes: {e}")
-        fallback_df = df[
-            df['Name'].notna() & 
-            (df['Name'] != '') &
-            (~df['Name'].astype(str).str.contains('Hold for', na=False))
-        ]
-        
-        if "Lead Semis" in competition_name:
-            fallback_df = fallback_df.head(24)
-        elif "Final" in competition_name:
-            fallback_df = fallback_df.head(8)
-            
-        return fallback_df
-
-
-def is_placeholder_athlete(name: str) -> bool:
-    """Check if name is a placeholder like 'Athlete 1', 'Athlete 23', etc."""
-    name_str = str(name).strip()
-    if name_str.startswith('Athlete '):
-        remaining = name_str[8:].strip()
-        return remaining.isdigit()
-    return False
-
-
-def display_qualification_thresholds(qualification_info: Dict[str, str]):
-    """Display qualification thresholds if available"""
-    if qualification_info:
-        threshold_items = []
-        threshold_mapping = {
-            'Hold for 1st': ('🥇 1st', '#FFD700'),
-            'Hold for 2nd': ('🥈 2nd', '#C0C0C0'),
-            'Hold for 3rd': ('🥉 3rd', '#CD7F32'),
-            'Hold to Qualify': ('✅ Qualify', '#28a745'),
-            'Min to Qualify': ('⚠️ Min', '#ffc107')
-        }
-        
-        for key, value in qualification_info.items():
-            if key in threshold_mapping:
-                label, color = threshold_mapping[key]
-                threshold_items.append(f'<span style="color: {color}; font-weight: bold;">{label}: {value}</span>')
-        
-        if threshold_items:
-            st.markdown(f"""
-            <div class="threshold-card">
-                <h5>🎯 Qualification Thresholds</h5>
-                {' | '.join(threshold_items)}
+            completion_rate = (metrics["completed"] / max(metrics["total_athletes"], 1)) * 100
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>✅ Completed</h4>
+                <h2>{metrics["completed"]}</h2>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {completion_rate}%"></div>
+                </div>
             </div>
-            """, unsafe_allow_html=True)
-
-
-def display_lead_athletes(active_df: pd.DataFrame, qualification_info: Dict[str, str]):
-    """Display lead competition athletes with enhanced formatting"""
-    try:
-        if 'Current Rank' in active_df.columns:
-            active_df['Current Rank'] = pd.to_numeric(active_df['Current Rank'], errors='coerce')
-            active_df = active_df.sort_values('Current Rank', ascending=True).reset_index(drop=True)
-    except Exception as e:
-        logger.warning(f"Could not sort by rank: {e}")
-    
-    for _, row in active_df.iterrows():
-        name = DataProcessor.clean_text(str(row.get('Name', 'Unknown')))
-        score = row.get('Manual Score', 'N/A')
-        rank = row.get('Current Rank', 'N/A')
-        status = DataProcessor.clean_text(str(row.get('Status', 'Unknown')))
-        worst_finish = row.get('Worst Finish', 'N/A')
+            ''', unsafe_allow_html=True)
         
-        has_score = score not in ['N/A', '', None] and not pd.isna(score)
+        with col3:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>📊 Avg Score</h4>
+                <h2>{metrics["avg_score"]:.1f}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
         
-        threshold_display = create_threshold_display(has_score, qualification_info)
-        
-        card_class, status_emoji = determine_lead_athlete_status(status, has_score)
-        
-        position_emoji = get_lead_position_emoji(rank, has_score, card_class, status_emoji)
-        
-        score_display = score if has_score else "Awaiting Result"
-        worst_finish_display = format_worst_finish(worst_finish, has_score)
-        
-        st.markdown(f"""
-        <div class="athlete-row {card_class}">
-            <strong>{position_emoji} #{rank} - {name}</strong><br>
-            <small>Score: {score_display} | Status: {status}{worst_finish_display}</small>{threshold_display}
-        </div>
-        """, unsafe_allow_html=True)
-
-
-def create_threshold_display(has_score: bool, qualification_info: Dict[str, str]) -> str:
-    """Create threshold display for athletes without scores"""
-    if has_score or not qualification_info:
-        return ""
-    
-    thresholds = []
-    for key, value in qualification_info.items():
-        if key == 'Hold for 1st':
-            thresholds.append(f'🥇 For 1st Hold: {value}')
-        elif key == 'Hold for 2nd':
-            thresholds.append(f'🥈 For 2nd Hold: {value}')
-        elif key == 'Hold for 3rd':
-            thresholds.append(f'🥉 For 3rd Hold: {value}')
-        elif key == 'Hold to Qualify':
-            thresholds.append(f'🎯 For 8th Hold: {value}')
-        elif key == 'Min to Qualify':
-            thresholds.append(f'📊 For 8th Points: {value}')
-    
-    if thresholds:
-        return f"<br><div class='targets'><strong>Targets:</strong><br>{' | '.join(thresholds)}</div>"
-    return ""
-
-
-def get_lead_position_emoji(rank: any, has_score: bool, card_class: str, status_emoji: str) -> str:
-    """Get position emoji for lead athletes"""
-    rank_num = DataProcessor.safe_numeric_conversion(rank)
-    if rank_num > 0:
-        return status_emoji if has_score and card_class else f"#{rank_num}"
-    return "📄"
-
-
-def format_worst_finish(worst_finish: any, has_score: bool) -> str:
-    """Format worst finish display"""
-    if not has_score or worst_finish in ['N/A', '', None] or pd.isna(worst_finish):
-        return ""
-    
-    worst_finish_clean = DataProcessor.clean_text(str(worst_finish))
-    return f" | Worst Finish: {worst_finish_clean}" if worst_finish_clean and worst_finish_clean != '-' else ""
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logger.error(f"Application error: {e}")
-        st.error(f"🚫 Application Error: {e}")
-        st.markdown("Please refresh the page or contact support if the issue persists.")
-        
-        with st.expander("🔧 Debug Information"):
-            st.code(f"Error: {e}")
-            st.code(f"Time: {datetime.now()}")
-            import traceback
-            st.code(traceback.format_exc())
+        with col4:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>🥇 Leader</h4>
+                <h2>{metrics["leader"][:15]}{"..." if len(metrics["leader"]) > 15 else ""}</h2>
