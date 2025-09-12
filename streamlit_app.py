@@ -660,10 +660,10 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
                 if rank_num <= 3:
                     # Extract worst finish number from the display string
                     worst_finish_num = extract_worst_finish_number(boulder_info)
-                    if worst_finish_num is not None and worst_finish_num < 3:
-                        return "podium-position", "🏆"  # GREEN - Top 3 with good worst finish
+                    if worst_finish_num is not None and worst_finish_num <= 3:
+                        return "podium-position", "🏆"  # GREEN - Top 3 with worst finish 1, 2, or 3
                     else:
-                        return "podium-contention", "⚠️"  # YELLOW - Top 3 but bad worst finish
+                        return "podium-contention", "⚠️"  # YELLOW - Top 3 but worst finish > 3
                 else:
                     return "no-podium", "❌"  # RED - Not in top 3
         
