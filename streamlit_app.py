@@ -680,6 +680,7 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
         logger.warning(f"Error: {e}")
         return "awaiting-result", "⏳"
 
+
 def extract_worst_finish_number(boulder_info: Dict) -> Optional[int]:
     """Extract the worst finish number from boulder info"""
     try:
@@ -693,6 +694,27 @@ def extract_worst_finish_number(boulder_info: Dict) -> Optional[int]:
     except Exception as e:
         logger.warning(f"Error extracting worst finish number: {e}")
     return None
+
+def check_all_podium_impossible(row: pd.Series) -> bool:
+    """Check if all podium positions (1st, 2nd, 3rd) are impossible - ONLY for finals"""
+    try:
+        strategy_cols = ['1st Place Strategy', '2nd Place Strategy', '3rd Place Strategy']
+        impossible_count = 0
+        
+        for col in strategy_cols:
+            if col in row.index:
+                strategy_value = row.get(col, '')
+                if strategy_value and str(strategy_value) not in ['', 'nan', 'N/A']:
+                    strategy_clean = str(strategy_value).upper()
+                    if "IMPOSSIBLE" in strategy_clean:
+                        impossible_count += 1
+        
+        # Return True if all three positions are impossible
+        return impossible_count == 3
+        
+    except Exception as e:
+        logger.warning(f"Error checking impossible podium positions: {e}")
+        return False
     
 def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, str]:
     """Determine lead athlete status - FIXED"""
