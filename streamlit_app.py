@@ -647,7 +647,7 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
                     if worst_finish_num is not None and worst_finish_num < 8:
                         return "qualified", "✅"  # GREEN - Top 8 with good worst finish
                     else:
-                        return "eliminated", "❌"  # RED - Top 8 but bad worst finish
+                        return "podium-contention", "⚠️"  # YELLOW - Top 8 but bad worst finish
                 else:
                     return "eliminated", "❌"  # RED - Not in top 8
         
