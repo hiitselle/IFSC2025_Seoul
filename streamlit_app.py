@@ -634,15 +634,22 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
         if rank_num <= 0:
             return "awaiting-result", "⏳"
         
-        # FIXED LOGIC - Always returns valid CSS classes
+        # FIXED LOGIC - Boulder Semis now checks worst finish
         if "Boulder" in competition_name and "Semis" in competition_name:
             if completed_boulders < 4:
                 # Still competing - yellow for everyone
                 return "podium-contention", "⚠️"
-            elif rank_num <= 8:
-                return "qualified", "✅"  # GREEN
             else:
-                return "eliminated", "❌"  # RED
+                # All 4 boulders completed - check rank AND worst finish
+                if rank_num <= 8:
+                    # Extract worst finish number from the display string
+                    worst_finish_num = extract_worst_finish_number(boulder_info)
+                    if worst_finish_num is not None and worst_finish_num < 8:
+                        return "qualified", "✅"  # GREEN - Top 8 with good worst finish
+                    else:
+                        return "eliminated", "❌"  # RED - Top 8 but bad worst finish
+                else:
+                    return "eliminated", "❌"  # RED - Not in top 8
         
         elif "Boulder" in competition_name and "Final" in competition_name:
             if completed_boulders < 4:
@@ -666,6 +673,20 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
         logger.warning(f"Error: {e}")
         return "awaiting-result", "⏳"
 
+def extract_worst_finish_number(boulder_info: Dict) -> Optional[int]:
+    """Extract the worst finish number from boulder info"""
+    try:
+        worst_finish_display = boulder_info.get('worst_finish_display', '')
+        if worst_finish_display:
+            # Look for patterns like "Worst Finish: 9.0" or "Worst Finish: 7"
+            import re
+            match = re.search(r'Worst Finish:\s*(\d+(?:\.\d+)?)', worst_finish_display)
+            if match:
+                return int(float(match.group(1)))
+    except Exception as e:
+        logger.warning(f"Error extracting worst finish number: {e}")
+    return None
+    
 def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, str]:
     """Determine lead athlete status - FIXED"""
     if not has_score:
