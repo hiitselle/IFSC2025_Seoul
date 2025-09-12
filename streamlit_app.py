@@ -1020,11 +1020,11 @@ def display_boulder_athlete_cards(df_sorted: pd.DataFrame, score_col: Optional[s
         
         # Calculate boulder completion
         boulder_info = calculate_boulder_completion(row)
-
+        
+        # Determine athlete status and styling
         card_class, position_emoji = determine_athlete_status(
-    rank, total_score, boulder_info, competition_name, row
-)
-    
+            rank, total_score, boulder_info, competition_name
+        )
         
         # Create strategy display if applicable
         strategy_display = create_strategy_display(row, boulder_info, competition_name)
