@@ -293,23 +293,30 @@ class DataProcessor:
             logger.warning(f"Error converting {value} to numeric: {e}")
             return default
 
-    @staticmethod
-    def clean_text(text) -> str:
-        """Enhanced text cleaning with better Unicode handling"""
-        if not isinstance(text, str):
-            return str(text) if text is not None else ""
+@staticmethod
+def clean_text(text) -> str:
+    """Enhanced text cleaning with better Unicode handling"""
+    if not isinstance(text, str):
+        return str(text) if text is not None else ""
+    
+    try:
+        # Better Unicode handling
+        cleaned = text.encode('utf-8', 'ignore').decode('utf-8')
         
-        try:
-            # Better Unicode handling
-            cleaned = text.encode('utf-8', 'ignore').decode('utf-8')
-            # Remove extra whitespace
-            cleaned = ' '.join(cleaned.split())
-            # Remove common problematic characters
-            cleaned = re.sub(r'[^\w\s\-\.\,\(\)]+', '', cleaned)
-            return cleaned.strip()
-        except Exception as e:
-            logger.warning(f"Error cleaning text '{text}': {e}")
-            return str(text) if text is not None else ""
+        # Remove common problematic characters and encoding artifacts
+        cleaned = cleaned.replace('â', '')  # Remove the specific problematic character
+        cleaned = cleaned.replace('Â', '')  # Remove capital version too
+        
+        # Remove other common encoding artifacts
+        cleaned = re.sub(r'[^\w\s\-\.\,\(\)]+', '', cleaned)
+        
+        # Remove extra whitespace
+        cleaned = ' '.join(cleaned.split())
+        
+        return cleaned.strip()
+    except Exception as e:
+        logger.warning(f"Error cleaning text '{text}': {e}")
+        return str(text) if text is not None else ""
 
     @staticmethod
     def validate_dataframe(df: pd.DataFrame, expected_columns: List[str]) -> Tuple[bool, List[str]]:
