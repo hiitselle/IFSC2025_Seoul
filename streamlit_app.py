@@ -623,7 +623,7 @@ def display_enhanced_metrics(df: pd.DataFrame, competition_name: str):
             </div>
             ''', unsafe_allow_html=True)
 
-def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str) -> Tuple[str, str]:
+def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, competition_name: str, row: pd.Series = None) -> Tuple[str, str]:
     """Determine athlete status and appropriate styling - FIXED"""
     try:
         rank_num = DataProcessor.safe_numeric_conversion(rank)
@@ -634,8 +634,30 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
         if rank_num <= 0:
             return "awaiting-result", "⏳"
         
-        # FIXED LOGIC - Boulder Semis now checks worst finish
-        if "Boulder" in competition_name and "Semis" in competition_name:
+        # BOULDER FINALS - Check if all podium positions are impossible
+        if "Boulder" in competition_name and "Final" in competition_name:
+            if completed_boulders < 4:
+                # Still competing - yellow for everyone
+                return "podium-contention", "⚠️"
+            else:
+                # All 4 boulders completed
+                # Check if all podium positions are impossible
+                if row is not None and check_all_podium_impossible(row):
+                    return "no-podium", "❌"  # RED - All podium positions impossible
+                
+                # Otherwise check rank AND worst finish for podium
+                if rank_num <= 3:
+                    # Extract worst finish number from the display string
+                    worst_finish_num = extract_worst_finish_number(boulder_info)
+                    if worst_finish_num is not None and worst_finish_num <= 3:
+                        return "podium-position", "🏆"  # GREEN - Top 3 with worst finish 1, 2, or 3
+                    else:
+                        return "podium-contention", "⚠️"  # YELLOW - Top 3 but worst finish > 3
+                else:
+                    return "no-podium", "❌"  # RED - Not in top 3
+        
+        # BOULDER SEMIS - Check worst finish
+        elif "Boulder" in competition_name and "Semis" in competition_name:
             if completed_boulders < 4:
                 # Still competing - yellow for everyone
                 return "podium-contention", "⚠️"
@@ -650,22 +672,6 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
                         return "podium-contention", "⚠️"  # YELLOW - Top 8 but bad worst finish
                 else:
                     return "eliminated", "❌"  # RED - Not in top 8
-        
-        elif "Boulder" in competition_name and "Final" in competition_name:
-            if completed_boulders < 4:
-                # Still competing - yellow for everyone
-                return "podium-contention", "⚠️"
-            else:
-                # All 4 boulders completed - check rank AND worst finish for podium
-                if rank_num <= 3:
-                    # Extract worst finish number from the display string
-                    worst_finish_num = extract_worst_finish_number(boulder_info)
-                    if worst_finish_num is not None and worst_finish_num <= 3:
-                        return "podium-position", "🏆"  # GREEN - Top 3 with worst finish 1, 2, or 3
-                    else:
-                        return "podium-contention", "⚠️"  # YELLOW - Top 3 but worst finish > 3
-                else:
-                    return "no-podium", "❌"  # RED - Not in top 3
         
         # Default for all other cases
         else:
