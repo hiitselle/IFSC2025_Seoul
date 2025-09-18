@@ -259,10 +259,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Configuration with enhanced settings
+# Configuration with updated auto-refresh settings
 class Config:
-    CACHE_TTL = 30
-    AUTO_REFRESH_INTERVAL = 60
+    CACHE_TTL = 2  # Reduced cache time to 2 seconds
+    AUTO_REFRESH_INTERVAL = 2  # Refresh every 2 seconds
     MAX_RETRIES = 3
     REQUEST_TIMEOUT = 15
     MAX_ATHLETES_DISPLAY = 50
@@ -749,13 +749,13 @@ def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, st
         return "podium-contention", "📊"
 
 def main():
-    """Enhanced main application function"""
+    """Enhanced main application function with forced auto-refresh"""
     
     # Initialize session state
     if 'last_refresh' not in st.session_state:
         st.session_state.last_refresh = datetime.now()
     if 'auto_refresh_enabled' not in st.session_state:
-        st.session_state.auto_refresh_enabled = True
+        st.session_state.auto_refresh_enabled = True  # Always enabled
     if 'selected_competitions' not in st.session_state:
         st.session_state.selected_competitions = []
     
@@ -764,25 +764,20 @@ def main():
     <div class="main-header">
         <h1>🧗‍♂️ IFSC 2025 World Championships</h1>
         <h3>Live Competition Results Dashboard</h3>
-        <p style="margin: 0; opacity: 0.9;">Real-time climbing competition tracking</p>
+        <p style="margin: 0; opacity: 0.9;">Real-time climbing competition tracking - Auto-refreshing every 2 seconds</p>
     </div>
     """, unsafe_allow_html=True)
     
     # Enhanced sidebar
     st.sidebar.title("🎯 Dashboard Controls")
     
-    # Auto-refresh section
+    # Auto-refresh section - ALWAYS ENABLED
     with st.sidebar.expander("🔄 Refresh Settings", expanded=True):
-        auto_refresh = st.checkbox(
-            "Enable Auto-Refresh", 
-            value=st.session_state.auto_refresh_enabled,
-            help=f"Updates every {Config.AUTO_REFRESH_INTERVAL}s"
-        )
-        st.session_state.auto_refresh_enabled = auto_refresh
+        st.markdown("**Auto-refresh is ALWAYS ON - Every 2 seconds**")
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔄 Refresh", type="primary", use_container_width=True):
+            if st.button("🔄 Manual Refresh", type="primary", use_container_width=True):
                 st.cache_data.clear()
                 st.session_state.last_refresh = datetime.now()
                 st.success("✅ Refreshed!")
@@ -797,6 +792,7 @@ def main():
         # Show refresh status
         time_since = (datetime.now() - st.session_state.last_refresh).seconds
         st.caption(f"🕒 Last refresh: {time_since}s ago")
+        st.caption("⚡ Next refresh in: " + str(2 - (time_since % 2)) + "s")
     
     # Competition filters
     with st.sidebar.expander("🎯 Competition Filters", expanded=True):
@@ -864,7 +860,7 @@ def main():
     with col4:
         st.markdown(f'''
         <div class="metric-card">
-            <h4>📄 Upcoming</h4>
+            <h4>🔄 Upcoming</h4>
             <h2>{overview_metrics["upcoming"]}</h2>
         </div>
         ''', unsafe_allow_html=True)
@@ -893,14 +889,14 @@ def main():
     with col2:
         st.markdown("**📊 Real-time Results**")
     with col3:
-        st.markdown(f"**🔄 Auto-refresh: {'ON' if st.session_state.auto_refresh_enabled else 'OFF'}**")
+        st.markdown("**🔄 Auto-refresh: ALWAYS ON (2s)**")
     
-    # Auto-refresh logic
-    if st.session_state.auto_refresh_enabled:
-        time_since_last = (datetime.now() - st.session_state.last_refresh).total_seconds()
-        if time_since_last >= Config.AUTO_REFRESH_INTERVAL:
-            st.session_state.last_refresh = datetime.now()
-            st.rerun()
+    # FORCED Auto-refresh logic - ALWAYS ACTIVE
+    time_since_last = (datetime.now() - st.session_state.last_refresh).total_seconds()
+    if time_since_last >= Config.AUTO_REFRESH_INTERVAL:
+        st.session_state.last_refresh = datetime.now()
+        st.cache_data.clear()  # Clear cache on each refresh
+        st.rerun()
 
 
 def get_filtered_competitions(competition_type: str, gender_filter: str, round_filter: str) -> Dict[str, str]:
