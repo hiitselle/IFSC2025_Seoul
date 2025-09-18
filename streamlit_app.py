@@ -636,16 +636,15 @@ def determine_athlete_status(rank: any, total_score: any, boulder_info: Dict, co
         
         # BOULDER FINALS - Check if all podium positions are impossible
         if "Boulder" in competition_name and "Final" in competition_name:
+            # Check if all podium positions are impossible (regardless of completion status)
+            if row is not None and check_all_podium_impossible(row):
+                return "no-podium", "❌"  # RED - All podium positions impossible
+            
             if completed_boulders < 4:
-                # Still competing - yellow for everyone
+                # Still competing - yellow for everyone (unless impossible above)
                 return "podium-contention", "⚠️"
             else:
-                # All 4 boulders completed
-                # Check if all podium positions are impossible
-                if row is not None and check_all_podium_impossible(row):
-                    return "no-podium", "❌"  # RED - All podium positions impossible
-                
-                # Otherwise check rank AND worst finish for podium
+                # All 4 boulders completed - check rank AND worst finish for podium
                 if rank_num <= 3:
                     # Extract worst finish number from the display string
                     worst_finish_num = extract_worst_finish_number(boulder_info)
