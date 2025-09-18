@@ -731,18 +731,18 @@ def check_all_podium_impossible(row: pd.Series) -> bool:
 def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, str]:
     """Determine lead athlete status - FIXED"""
     if not has_score:
-        return "awaiting-result", "📄"
+        return "awaiting-result", "🔄"
     
     status_lower = str(status).lower()
     
-    if "qualified" in status_lower:
+    if "qualified" in status_lower and "contention" not in status_lower:
         return "qualified", "✅"
     elif "eliminated" in status_lower:
         return "eliminated", "❌"
-    elif "podium" in status_lower and "no podium" not in status_lower:
+    elif "podium" in status_lower and "no podium" not in status_lower and "contention" not in status_lower:
         return "podium-position", "🏆"
-    elif "contention" in status_lower:
-        return "podium-contention", "⚠️"
+    elif "contention" in status_lower or "podium contention" in status_lower:
+        return "podium-contention", "⚠️"  # YELLOW for podium contention
     elif "no podium" in status_lower:
         return "no-podium", "❌"
     else:
