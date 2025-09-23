@@ -25,6 +25,9 @@ import json
 # Multi-language support module - Add this to your existing streamlit_app.py
 
 # Language translations dictionary
+# Multi-language support module - Add this to your existing streamlit_app.py
+
+# Language translations dictionary
 LANGUAGES = {
     "🇺🇸 English": {
         "app_title": "🧗‍♂️ IFSC 2025 World Championships",
@@ -277,6 +280,48 @@ LANGUAGES = {
         "female": "女子",
         "semis": "準決勝",
         "final": "決勝",
+    },
+    "🇰🇷 한국어": {
+        "app_title": "🧗‍♂️ IFSC 2025 세계선수권대회",
+        "app_subtitle": "실시간 경기 결과 대시보드",
+        "app_description": "실시간 클라이밍 경기 추적 - 2초마다 자동 새로고침",
+        "dashboard_controls": "🎯 대시보드 제어",
+        "refresh_settings": "🔄 새로고침 설정",
+        "auto_refresh_status": "자동 새로고침이 항상 켜져 있습니다 - 2초마다",
+        "manual_refresh": "🔄 수동 새로고침",
+        "clear_cache": "🗑️ 캐시 지우기",
+        "last_refresh": "🕒 마지막 새로고침: {}초 전",
+        "next_refresh": "⚡ 다음 새로고침까지: {}초",
+        "competition_filters": "🎯 경기 필터",
+        "discipline": "⛰️ 종목",
+        "gender": "👤 성별",
+        "round": "🎯 라운드",
+        "competition_overview": "🚀 경기 개요",
+        "total": "🏆 전체",
+        "live": "🔴 라이브",
+        "completed": "✅ 완료",
+        "upcoming": "🔄 예정",
+        "live_results": "📊 실시간 결과",
+        "current_standings": "📋 현재 순위",
+        "athletes": "👥 선수",
+        "problems_completed": "🧗‍♂️ 완등한 문제 수",
+        "avg_score": "📊 평균 점수",
+        "leader": "🥇 선두",
+        "qualification_thresholds": "🎯 통과 기준",
+        "no_data": "⚠️ 데이터가 없습니다",
+        "no_competitions_found": "⚠️ 경기를 찾을 수 없습니다",
+        "adjust_filters": "현재 필터와 일치하는 경기가 없습니다. 선택을 조정해 주세요.",
+        "loading": "{} 로딩 중...",
+        "last_updated": "📡 마지막 업데이트: {}",
+        "refreshed": "✅ 새로고침 완료!",
+        "cache_cleared": "✅ 캐시 지우기 완료!",
+        "all": "전체",
+        "boulder": "볼더링",
+        "lead": "리드",
+        "male": "남자",
+        "female": "여자",
+        "semis": "준결승",
+        "final": "결승",
     }
 }
 
@@ -324,6 +369,7 @@ def language_selector():
                 st.session_state.selected_language = selected_language
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 logging.basicConfig(level=logging.INFO)
