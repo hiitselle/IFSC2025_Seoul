@@ -21,420 +21,7 @@ from scipy import stats
 from concurrent.futures import ThreadPoolExecutor
 import json
 
-
-# Multi-language support module - Add this to your existing streamlit_app.py
-
-# Language translations dictionary
-# Multi-language support module - Add this to your existing streamlit_app.py
-
-# Language translations dictionary
-LANGUAGES = {
-    "🇺🇸 English": {
-        "app_title": "🧗‍♂️ IFSC 2025 World Championships",
-        "app_subtitle": "Live Competition Results Dashboard",
-        "app_description": "Real-time climbing competition tracking - Auto-refreshing every 2 seconds",
-        "dashboard_controls": "🎯 Dashboard Controls",
-        "refresh_settings": "🔄 Refresh Settings",
-        "auto_refresh_status": "Auto-refresh is ALWAYS ON - Every 2 seconds",
-        "manual_refresh": "🔄 Manual Refresh",
-        "clear_cache": "🗑️ Clear Cache",
-        "last_refresh": "🕒 Last refresh: {}s ago",
-        "next_refresh": "⚡ Next refresh in: {}s",
-        "competition_filters": "🎯 Competition Filters",
-        "discipline": "⛰️ Discipline",
-        "gender": "👤 Gender",
-        "round": "🎯 Round",
-        "competition_overview": "🚀 Competition Overview",
-        "total": "🏆 Total",
-        "live": "🔴 Live",
-        "completed": "✅ Completed",
-        "upcoming": "🔄 Upcoming",
-        "live_results": "📊 Live Results",
-        "current_standings": "📋 Current Standings",
-        "athletes": "👥 Athletes",
-        "problems_completed": "🧗‍♂️ Problems Completed",
-        "avg_score": "📊 Avg Score",
-        "leader": "🥇 Leader",
-        "qualification_thresholds": "🎯 Qualification Thresholds",
-        "no_data": "⚠️ No data available",
-        "no_competitions_found": "⚠️ No Competitions Found",
-        "adjust_filters": "No competitions match your current filters. Please adjust your selection.",
-        "loading": "Loading {}...",
-        "last_updated": "📡 Last updated: {}",
-        "refreshed": "✅ Refreshed!",
-        "cache_cleared": "✅ Cache cleared!",
-        "all": "All",
-        "boulder": "Boulder",
-        "lead": "Lead",
-        "male": "Male",
-        "female": "Female",
-        "semis": "Semis",
-        "final": "Final",
-          "live_upper": "LIVE",
-        "completed_upper": "COMPLETED", 
-        "upcoming_upper": "UPCOMING",
-        "name": "Name",
-        "score": "Score", 
-        "status": "Status",
-        "awaiting_result": "Awaiting Result",
-        "progress": "Progress",
-        "boulder_remaining": "boulder remaining",
-        "targets": "Targets",
-        "strategy": "Strategy",
-        "for_1st_hold": "For 1st Hold",
-        "for_2nd_hold": "For 2nd Hold", 
-        "for_3rd_hold": "For 3rd Hold",
-        "for_8th_hold": "For 8th Hold",
-        "for_8th_points": "For 8th Points",
-        "worst_finish": "Worst Finish",
-        "unknown": "Unknown",
-        "no_boulder_data": "No boulder data",
-        "raw_data": "Raw Data",
-        "data_validation_failed": "Data validation failed",
-        "name_column_not_found": "Name column not found in data",
-        "application_error": "Application Error",
-        "refresh_page": "Please refresh the page or contact support if the issue persists.",
-        "debug_information": "Debug Information",
-        "help_discipline": "Filter by climbing discipline",
-        "help_gender": "Filter by gender category", 
-        "help_round": "Filter by competition round",
-        "ifsc_world_championships": "IFSC World Championships 2025",
-        "real_time_results": "Real-time Results",
-        "auto_refresh_always_on": "Auto-refresh: ALWAYS ON (2s)",
-    },
-    "🇫🇷 Français": {
-        "app_title": "🧗‍♂️ Championnats du Monde IFSC 2025",
-        "app_subtitle": "Tableau de Bord des Résultats en Direct",
-        "app_description": "Suivi en temps réel des compétitions d'escalade - Actualisation automatique toutes les 2 secondes",
-        "dashboard_controls": "🎯 Contrôles du Tableau de Bord",
-        "refresh_settings": "🔄 Paramètres d'Actualisation",
-        "auto_refresh_status": "L'actualisation automatique est TOUJOURS ACTIVÉE - Toutes les 2 secondes",
-        "manual_refresh": "🔄 Actualisation Manuelle",
-        "clear_cache": "🗑️ Vider le Cache",
-        "last_refresh": "🕒 Dernière actualisation : il y a {}s",
-        "next_refresh": "⚡ Prochaine actualisation dans : {}s",
-        "competition_filters": "🎯 Filtres de Compétition",
-        "discipline": "⛰️ Discipline",
-        "gender": "👤 Genre",
-        "round": "🎯 Manche",
-        "competition_overview": "🚀 Aperçu de la Compétition",
-        "total": "🏆 Total",
-        "live": "🔴 En Direct",
-        "completed": "✅ Terminé",
-        "upcoming": "🔄 À Venir",
-        "live_results": "📊 Résultats en Direct",
-        "current_standings": "📋 Classement Actuel",
-        "athletes": "👥 Athlètes",
-        "problems_completed": "🧗‍♂️ Problèmes Résolus",
-        "avg_score": "📊 Score Moyen",
-        "leader": "🥇 Leader",
-        "qualification_thresholds": "🎯 Seuils de Qualification",
-        "no_data": "⚠️ Aucune donnée disponible",
-        "no_competitions_found": "⚠️ Aucune Compétition Trouvée",
-        "adjust_filters": "Aucune compétition ne correspond à vos filtres actuels. Veuillez ajuster votre sélection.",
-        "loading": "Chargement de {}...",
-        "last_updated": "📡 Dernière mise à jour : {}",
-        "refreshed": "✅ Actualisé !",
-        "cache_cleared": "✅ Cache vidé !",
-        "all": "Tous",
-        "boulder": "Bloc",
-        "lead": "Difficulté",
-        "male": "Hommes",
-        "female": "Femmes",
-        "semis": "Demi-finales",
-        "final": "Finale",
-        "live_upper": "EN DIRECT",
-        "completed_upper": "TERMINÉ",
-        "upcoming_upper": "À VENIR",
-        "name": "Nom",
-        "score": "Score",
-        "status": "Statut", 
-        "awaiting_result": "En Attente du Résultat",
-        "progress": "Progrès",
-        "boulder_remaining": "bloc restant",
-        "targets": "Objectifs",
-        "strategy": "Stratégie",
-        "for_1st_hold": "Pour 1ère Place",
-        "for_2nd_hold": "Pour 2ème Place",
-        "for_3rd_hold": "Pour 3ème Place", 
-        "for_8th_hold": "Pour 8ème Place",
-        "for_8th_points": "Pour 8ème Points",
-        "worst_finish": "Pire Classement",
-        "unknown": "Inconnu",
-        "no_boulder_data": "Aucune donnée de bloc",
-        "raw_data": "Données Brutes",
-        "data_validation_failed": "Validation des données échouée",
-        "name_column_not_found": "Colonne nom non trouvée dans les données",
-        "application_error": "Erreur d'Application",
-        "refresh_page": "Veuillez actualiser la page ou contacter le support si le problème persiste.",
-        "debug_information": "Informations de Débogage",
-        "help_discipline": "Filtrer par discipline d'escalade",
-        "help_gender": "Filtrer par catégorie de genre",
-        "help_round": "Filtrer par manche de compétition", 
-        "ifsc_world_championships": "Championnats du Monde IFSC 2025",
-        "real_time_results": "Résultats en Temps Réel",
-        "auto_refresh_always_on": "Actualisation automatique : TOUJOURS ACTIVE (2s)",
-    },
-    },
-    "🇩🇪 Deutsch": {
-        "app_title": "🧗‍♂️ IFSC Weltmeisterschaft 2025",
-        "app_subtitle": "Live Wettkampfergebnis Dashboard",
-        "app_description": "Echtzeit-Kletternwettkampf-Verfolgung - Automatische Aktualisierung alle 2 Sekunden",
-        "dashboard_controls": "🎯 Dashboard-Steuerung",
-        "refresh_settings": "🔄 Aktualisierungseinstellungen",
-        "auto_refresh_status": "Automatische Aktualisierung ist IMMER EIN - Alle 2 Sekunden",
-        "manual_refresh": "🔄 Manuelle Aktualisierung",
-        "clear_cache": "🗑️ Cache Leeren",
-        "last_refresh": "🕒 Letzte Aktualisierung: vor {}s",
-        "next_refresh": "⚡ Nächste Aktualisierung in: {}s",
-        "competition_filters": "🎯 Wettkampffilter",
-        "discipline": "⛰️ Disziplin",
-        "gender": "👤 Geschlecht",
-        "round": "🎯 Runde",
-        "competition_overview": "🚀 Wettkampfübersicht",
-        "total": "🏆 Gesamt",
-        "live": "🔴 Live",
-        "completed": "✅ Abgeschlossen",
-        "upcoming": "🔄 Anstehend",
-        "live_results": "📊 Live-Ergebnisse",
-        "current_standings": "📋 Aktuelle Rangliste",
-        "athletes": "👥 Athleten",
-        "problems_completed": "🧗‍♂️ Gelöste Probleme",
-        "avg_score": "📊 Durchschnittswertung",
-        "leader": "🥇 Führender",
-        "qualification_thresholds": "🎯 Qualifikationsschwellen",
-        "no_data": "⚠️ Keine Daten verfügbar",
-        "no_competitions_found": "⚠️ Keine Wettkämpfe Gefunden",
-        "adjust_filters": "Keine Wettkämpfe entsprechen Ihren aktuellen Filtern. Bitte passen Sie Ihre Auswahl an.",
-        "loading": "Lade {}...",
-        "last_updated": "📡 Zuletzt aktualisiert: {}",
-        "refreshed": "✅ Aktualisiert!",
-        "cache_cleared": "✅ Cache geleert!",
-        "all": "Alle",
-        "boulder": "Bouldern",
-        "lead": "Vorstieg",
-        "male": "Männer",
-        "female": "Frauen",
-        "semis": "Halbfinale",
-        "final": "Finale",
-    },
-    "🇪🇸 Español": {
-        "app_title": "🧗‍♂️ Campeonatos Mundiales IFSC 2025",
-        "app_subtitle": "Panel de Resultados de Competición en Vivo",
-        "app_description": "Seguimiento de competiciones de escalada en tiempo real - Actualización automática cada 2 segundos",
-        "dashboard_controls": "🎯 Controles del Panel",
-        "refresh_settings": "🔄 Configuración de Actualización",
-        "auto_refresh_status": "La actualización automática está SIEMPRE ACTIVADA - Cada 2 segundos",
-        "manual_refresh": "🔄 Actualización Manual",
-        "clear_cache": "🗑️ Limpiar Caché",
-        "last_refresh": "🕒 Última actualización: hace {}s",
-        "next_refresh": "⚡ Próxima actualización en: {}s",
-        "competition_filters": "🎯 Filtros de Competición",
-        "discipline": "⛰️ Disciplina",
-        "gender": "👤 Género",
-        "round": "🎯 Ronda",
-        "competition_overview": "🚀 Resumen de la Competición",
-        "total": "🏆 Total",
-        "live": "🔴 En Vivo",
-        "completed": "✅ Completado",
-        "upcoming": "🔄 Próximo",
-        "live_results": "📊 Resultados en Vivo",
-        "current_standings": "📋 Clasificación Actual",
-        "athletes": "👥 Atletas",
-        "problems_completed": "🧗‍♂️ Problemas Completados",
-        "avg_score": "📊 Puntuación Media",
-        "leader": "🥇 Líder",
-        "qualification_thresholds": "🎯 Umbrales de Clasificación",
-        "no_data": "⚠️ No hay datos disponibles",
-        "no_competitions_found": "⚠️ No se Encontraron Competiciones",
-        "adjust_filters": "Ninguna competición coincide con sus filtros actuales. Por favor, ajuste su selección.",
-        "loading": "Cargando {}...",
-        "last_updated": "📡 Última actualización: {}",
-        "refreshed": "✅ ¡Actualizado!",
-        "cache_cleared": "✅ ¡Caché limpiado!",
-        "all": "Todos",
-        "boulder": "Boulder",
-        "lead": "Dificultad",
-        "male": "Hombres",
-        "female": "Mujeres",
-        "semis": "Semifinales",
-        "final": "Final",
-    },
-    "🇮🇹 Italiano": {
-        "app_title": "🧗‍♂️ Campionati Mondiali IFSC 2025",
-        "app_subtitle": "Dashboard dei Risultati di Gara in Diretta",
-        "app_description": "Monitoraggio delle gare di arrampicata in tempo reale - Aggiornamento automatico ogni 2 secondi",
-        "dashboard_controls": "🎯 Controlli Dashboard",
-        "refresh_settings": "🔄 Impostazioni Aggiornamento",
-        "auto_refresh_status": "L'aggiornamento automatico è SEMPRE ATTIVO - Ogni 2 secondi",
-        "manual_refresh": "🔄 Aggiornamento Manuale",
-        "clear_cache": "🗑️ Svuota Cache",
-        "last_refresh": "🕒 Ultimo aggiornamento: {}s fa",
-        "next_refresh": "⚡ Prossimo aggiornamento in: {}s",
-        "competition_filters": "🎯 Filtri Competizione",
-        "discipline": "⛰️ Disciplina",
-        "gender": "👤 Genere",
-        "round": "🎯 Round",
-        "competition_overview": "🚀 Panoramica Competizione",
-        "total": "🏆 Totale",
-        "live": "🔴 In Diretta",
-        "completed": "✅ Completato",
-        "upcoming": "🔄 Prossimo",
-        "live_results": "📊 Risultati in Diretta",
-        "current_standings": "📋 Classifica Attuale",
-        "athletes": "👥 Atleti",
-        "problems_completed": "🧗‍♂️ Problemi Completati",
-        "avg_score": "📊 Punteggio Medio",
-        "leader": "🥇 Leader",
-        "qualification_thresholds": "🎯 Soglie di Qualificazione",
-        "no_data": "⚠️ Nessun dato disponibile",
-        "no_competitions_found": "⚠️ Nessuna Gara Trovata",
-        "adjust_filters": "Nessuna gara corrisponde ai tuoi filtri attuali. Si prega di regolare la selezione.",
-        "loading": "Caricamento {}...",
-        "last_updated": "📡 Ultimo aggiornamento: {}",
-        "refreshed": "✅ Aggiornato!",
-        "cache_cleared": "✅ Cache svuotata!",
-        "all": "Tutti",
-        "boulder": "Boulder",
-        "lead": "Lead",
-        "male": "Uomini",
-        "female": "Donne",
-        "semis": "Semifinali",
-        "final": "Finale",
-    },
-    "🇯🇵 日本語": {
-        "app_title": "🧗‍♂️ IFSC 2025世界選手権",
-        "app_subtitle": "ライブ競技結果ダッシュボード",
-        "app_description": "リアルタイムクライミング競技追跡 - 2秒ごとの自動更新",
-        "dashboard_controls": "🎯 ダッシュボード制御",
-        "refresh_settings": "🔄 更新設定",
-        "auto_refresh_status": "自動更新は常にON - 2秒ごと",
-        "manual_refresh": "🔄 手動更新",
-        "clear_cache": "🗑️ キャッシュクリア",
-        "last_refresh": "🕒 最終更新: {}秒前",
-        "next_refresh": "⚡ 次の更新まで: {}秒",
-        "competition_filters": "🎯 競技フィルター",
-        "discipline": "⛰️ 種目",
-        "gender": "👤 性別",
-        "round": "🎯 ラウンド",
-        "competition_overview": "🚀 競技概要",
-        "total": "🏆 合計",
-        "live": "🔴 ライブ",
-        "completed": "✅ 完了",
-        "upcoming": "🔄 予定",
-        "live_results": "📊 ライブ結果",
-        "current_standings": "📋 現在の順位",
-        "athletes": "👥 選手",
-        "problems_completed": "🧗‍♂️ 完登課題数",
-        "avg_score": "📊 平均得点",
-        "leader": "🥇 首位",
-        "qualification_thresholds": "🎯 予選通過ライン",
-        "no_data": "⚠️ データがありません",
-        "no_competitions_found": "⚠️ 競技が見つかりません",
-        "adjust_filters": "現在のフィルターに一致する競技がありません。選択を調整してください。",
-        "loading": "{}を読み込み中...",
-        "last_updated": "📡 最終更新: {}",
-        "refreshed": "✅ 更新完了！",
-        "cache_cleared": "✅ キャッシュクリア完了！",
-        "all": "すべて",
-        "boulder": "ボルダリング",
-        "lead": "リード",
-        "male": "男子",
-        "female": "女子",
-        "semis": "準決勝",
-        "final": "決勝",
-    },
-    "🇰🇷 한국어": {
-        "app_title": "🧗‍♂️ IFSC 2025 세계선수권대회",
-        "app_subtitle": "실시간 경기 결과 대시보드",
-        "app_description": "실시간 클라이밍 경기 추적 - 2초마다 자동 새로고침",
-        "dashboard_controls": "🎯 대시보드 제어",
-        "refresh_settings": "🔄 새로고침 설정",
-        "auto_refresh_status": "자동 새로고침이 항상 켜져 있습니다 - 2초마다",
-        "manual_refresh": "🔄 수동 새로고침",
-        "clear_cache": "🗑️ 캐시 지우기",
-        "last_refresh": "🕒 마지막 새로고침: {}초 전",
-        "next_refresh": "⚡ 다음 새로고침까지: {}초",
-        "competition_filters": "🎯 경기 필터",
-        "discipline": "⛰️ 종목",
-        "gender": "👤 성별",
-        "round": "🎯 라운드",
-        "competition_overview": "🚀 경기 개요",
-        "total": "🏆 전체",
-        "live": "🔴 라이브",
-        "completed": "✅ 완료",
-        "upcoming": "🔄 예정",
-        "live_results": "📊 실시간 결과",
-        "current_standings": "📋 현재 순위",
-        "athletes": "👥 선수",
-        "problems_completed": "🧗‍♂️ 완등한 문제 수",
-        "avg_score": "📊 평균 점수",
-        "leader": "🥇 선두",
-        "qualification_thresholds": "🎯 통과 기준",
-        "no_data": "⚠️ 데이터가 없습니다",
-        "no_competitions_found": "⚠️ 경기를 찾을 수 없습니다",
-        "adjust_filters": "현재 필터와 일치하는 경기가 없습니다. 선택을 조정해 주세요.",
-        "loading": "{} 로딩 중...",
-        "last_updated": "📡 마지막 업데이트: {}",
-        "refreshed": "✅ 새로고침 완료!",
-        "cache_cleared": "✅ 캐시 지우기 완료!",
-        "all": "전체",
-        "boulder": "볼더링",
-        "lead": "리드",
-        "male": "남자",
-        "female": "여자",
-        "semis": "준결승",
-        "final": "결승",
-    }
-}
-
-def get_text(key: str, language: str = None) -> str:
-    """Get localized text for the given key"""
-    if language is None:
-        language = st.session_state.get('selected_language', '🇺🇸 English')
-    
-    # Fallback to English if key not found in selected language
-    text = LANGUAGES.get(language, {}).get(key)
-    if text is None:
-        text = LANGUAGES['🇺🇸 English'].get(key, key)
-    
-    return text
-
-def language_selector():
-    """Display language selector at the top of the app"""
-    # Add language selector CSS
-    st.markdown("""
-    <style>
-        .language-selector {
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            padding: 0.5rem 1rem;
-            border-radius: 10px;
-            margin-bottom: 1rem;
-            text-align: center;
-            border: 1px solid #dee2e6;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    with st.container():
-        st.markdown('<div class="language-selector">', unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            selected_language = st.selectbox(
-                "🌐 Language / Langue / Sprache / Idioma / Lingua / 言語",
-                list(LANGUAGES.keys()),
-                index=list(LANGUAGES.keys()).index(st.session_state.get('selected_language', '🇺🇸 English')),
-                key="language_selector"
-            )
-            
-            if selected_language != st.session_state.get('selected_language'):
-                st.session_state.selected_language = selected_language
-                st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-
-
-
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -1171,85 +758,76 @@ def main():
         st.session_state.auto_refresh_enabled = True  # Always enabled
     if 'selected_competitions' not in st.session_state:
         st.session_state.selected_competitions = []
-    if 'selected_language' not in st.session_state:
-       st.session_state.selected_language = '🇺🇸 English'
-
-    language_selector()
     
-    # Enhanced header - ALREADY TRANSLATED ✅
-    st.markdown(f"""
-   <div class="main-header">
-       <h1>{get_text("app_title")}</h1>
-       <h3>{get_text("app_subtitle")}</h3>
-       <p style="margin: 0; opacity: 0.9;">{get_text("app_description")}</p>
-   </div>
-   """, unsafe_allow_html=True)
+    # Enhanced header
+    st.markdown("""
+    <div class="main-header">
+        <h1>🧗‍♂️ IFSC 2025 World Championships</h1>
+        <h3>Live Competition Results Dashboard</h3>
+        <p style="margin: 0; opacity: 0.9;">Real-time climbing competition tracking - Auto-refreshing every 2 seconds</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Enhanced sidebar - FIX: Use get_text() here
-    st.sidebar.title(get_text("dashboard_controls"))
+    # Enhanced sidebar
+    st.sidebar.title("🎯 Dashboard Controls")
     
-    # Auto-refresh section - FIX: Use get_text() here
-    with st.sidebar.expander(get_text("refresh_settings"), expanded=True):
-        st.markdown(f"**{get_text('auto_refresh_status')}**")
+    # Auto-refresh section - ALWAYS ENABLED
+    with st.sidebar.expander("🔄 Refresh Settings", expanded=True):
+        st.markdown("**Auto-refresh is ALWAYS ON - Every 2 seconds**")
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button(get_text("manual_refresh"), type="primary", use_container_width=True):
+            if st.button("🔄 Manual Refresh", type="primary", use_container_width=True):
                 st.cache_data.clear()
                 st.session_state.last_refresh = datetime.now()
-                st.success(get_text("refreshed"))
+                st.success("✅ Refreshed!")
                 time.sleep(0.5)
                 st.rerun()
         
         with col2:
-            if st.button(get_text("clear_cache"), use_container_width=True):
+            if st.button("🗑️ Clear Cache", use_container_width=True):
                 st.cache_data.clear()
-                st.success(get_text("cache_cleared"))
+                st.success("✅ Cache cleared!")
         
-        # Show refresh status - FIX: Use get_text() here
+        # Show refresh status
         time_since = (datetime.now() - st.session_state.last_refresh).seconds
-        st.caption(get_text("last_refresh").format(time_since))
-        st.caption(get_text("next_refresh").format(2 - (time_since % 2)))
+        st.caption(f"🕒 Last refresh: {time_since}s ago")
+        st.caption("⚡ Next refresh in: " + str(2 - (time_since % 2)) + "s")
     
-    # Competition filters - FIX: Use get_text() here
-    with st.sidebar.expander(get_text("competition_filters"), expanded=True):
+    # Competition filters
+    with st.sidebar.expander("🎯 Competition Filters", expanded=True):
         competition_type = st.selectbox(
-            get_text("discipline"),
-            [get_text("all"), get_text("boulder"), get_text("lead")],
+            "⛰️ Discipline",
+            ["All", "Boulder", "Lead"],
             help="Filter by climbing discipline"
         )
         
         gender_filter = st.selectbox(
-            get_text("gender"),
-            [get_text("all"), get_text("male"), get_text("female")],
+            "👤 Gender",
+            ["All", "Male", "Female"],
             help="Filter by gender category"
         )
         
         round_filter = st.selectbox(
-            get_text("round"),
-            [get_text("all"), get_text("semis"), get_text("final")],
+            "🎯 Round",
+            ["All", "Semis", "Final"],
             help="Filter by competition round"
         )
     
-    # Filter competitions - Need to map translated selections back to English
-    # Convert translated selections back to English for filtering
-    competition_type_en = map_to_english(competition_type, ["All", "Boulder", "Lead"])
-    gender_filter_en = map_to_english(gender_filter, ["All", "Male", "Female"])
-    round_filter_en = map_to_english(round_filter, ["All", "Semis", "Final"])
-    
-    filtered_competitions = get_filtered_competitions(competition_type_en, gender_filter_en, round_filter_en)
+    # Filter competitions
+    filtered_competitions = get_filtered_competitions(competition_type, gender_filter, round_filter)
     
     if not filtered_competitions:
-        st.markdown(f"""
+        st.markdown("""
         <div class="error-card">
-            <h3>{get_text("no_competitions_found")}</h3>
-            <p>{get_text("adjust_filters")}</p>
+            <h3>⚠️ No Competitions Found</h3>
+            <p>No competitions match your current filters. Please adjust your selection.</p>
         </div>
         """, unsafe_allow_html=True)
         return
     
-    # Competition overview - FIX: Use get_text() here
-    st.markdown(f"### {get_text('competition_overview')}")
+    # Competition overview
+    st.markdown("### 🚀 Competition Overview")
     
     # Calculate overview metrics with progress
     overview_metrics = calculate_overview_metrics(filtered_competitions)
@@ -1258,7 +836,7 @@ def main():
     with col1:
         st.markdown(f'''
         <div class="metric-card">
-            <h4>{get_text("total")}</h4>
+            <h4>🏆 Total</h4>
             <h2>{overview_metrics["total"]}</h2>
         </div>
         ''', unsafe_allow_html=True)
@@ -1266,7 +844,7 @@ def main():
     with col2:
         st.markdown(f'''
         <div class="metric-card">
-            <h4>{get_text("live")}</h4>
+            <h4>🔴 Live</h4>
             <h2>{overview_metrics["live"]}</h2>
         </div>
         ''', unsafe_allow_html=True)
@@ -1274,7 +852,7 @@ def main():
     with col3:
         st.markdown(f'''
         <div class="metric-card">
-            <h4>{get_text("completed")}</h4>
+            <h4>✅ Completed</h4>
             <h2>{overview_metrics["completed"]}</h2>
         </div>
         ''', unsafe_allow_html=True)
@@ -1282,13 +860,13 @@ def main():
     with col4:
         st.markdown(f'''
         <div class="metric-card">
-            <h4>{get_text("upcoming")}</h4>
+            <h4>🔄 Upcoming</h4>
             <h2>{overview_metrics["upcoming"]}</h2>
         </div>
         ''', unsafe_allow_html=True)
     
-    # Display results - FIX: Use get_text() here
-    st.markdown(f"### {get_text('live_results')}")
+    # Display results
+    st.markdown("### 📊 Live Results")
     
     if len(filtered_competitions) > 1:
         # Create tabs for multiple competitions
@@ -1319,243 +897,6 @@ def main():
         st.session_state.last_refresh = datetime.now()
         st.cache_data.clear()  # Clear cache on each refresh
         st.rerun()
-
-
-def map_to_english(translated_value: str, english_options: List[str]) -> str:
-    """Map translated filter values back to English for backend processing"""
-    current_lang = st.session_state.get('selected_language', '🇺🇸 English')
-    
-    # If already in English, return as-is
-    if current_lang == '🇺🇸 English':
-        return translated_value
-    
-    # Create reverse mapping
-    mapping = {
-        get_text("all"): "All",
-        get_text("boulder"): "Boulder", 
-        get_text("lead"): "Lead",
-        get_text("male"): "Male",
-        get_text("female"): "Female", 
-        get_text("semis"): "Semis",
-        get_text("final"): "Final"
-    }
-    
-    return mapping.get(translated_value, translated_value)
-
-
-def display_enhanced_metrics(df: pd.DataFrame, competition_name: str):
-    """Display enhanced metrics with progress indicators - TRANSLATED"""
-    col1, col2, col3, col4 = st.columns(4)
-    
-    if "Boulder" in competition_name:
-        metrics = MetricsCalculator.calculate_boulder_metrics(df)
-        
-        with col1:
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>{get_text("athletes")}</h4>
-                <h2>{metrics["total_athletes"]}</h2>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>{get_text("problems_completed")}</h4>
-                <h2>{metrics["completed_problems"]}</h2>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>{get_text("avg_score")}</h4>
-                <h2>{metrics["avg_score"]:.1f}</h2>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        with col4:
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>{get_text("leader")}</h4>
-                <h2>{metrics["leader"][:15]}{"..." if len(metrics["leader"]) > 15 else ""}</h2>
-            </div>
-            ''', unsafe_allow_html=True)
-    
-    elif "Lead" in competition_name:
-        metrics = MetricsCalculator.calculate_lead_metrics(df)
-        
-        with col1:
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>{get_text("athletes")}</h4>
-                <h2>{metrics["total_athletes"]}</h2>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        with col2:
-            completion_rate = (metrics["completed"] / max(metrics["total_athletes"], 1)) * 100
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>✅ {get_text("completed")}</h4>
-                <h2>{metrics["completed"]}</h2>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: {completion_rate}%"></div>
-                </div>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>{get_text("avg_score")}</h4>
-                <h2>{metrics["avg_score"]:.1f}</h2>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        with col4:
-            st.markdown(f'''
-            <div class="metric-card">
-                <h4>{get_text("leader")}</h4>
-                <h2>{metrics["leader"][:15]}{"..." if len(metrics["leader"]) > 15 else ""}</h2>
-            </div>
-            ''', unsafe_allow_html=True)
-
-
-def display_competition_results(comp_name: str, url: str):
-    """Display results for a single competition - TRANSLATED"""
-    with st.spinner(get_text("loading").format(comp_name)):
-        df = DataLoader.load_sheet_data(url)
-    
-    current_time = datetime.now().strftime("%H:%M:%S")
-    st.caption(get_text("last_updated").format(current_time))
-    
-    if "Boulder" in comp_name:
-        display_boulder_results(df, comp_name)
-    elif "Lead" in comp_name:
-        display_lead_results(df, comp_name)
-    else:
-        if not df.empty:
-            st.dataframe(df, use_container_width=True, hide_index=True)
-        else:
-            st.markdown(f'<div class="error-card">{get_text("no_data")}</div>', unsafe_allow_html=True)
-
-
-def display_boulder_results(df: pd.DataFrame, competition_name: str):
-    """Enhanced boulder competition results display - TRANSLATED"""
-    status, status_emoji = CompetitionStatusDetector.get_competition_status(df, competition_name)
-    status_class = f"badge-{status}"
-    
-    st.markdown(f"""
-    ### 🪨 {competition_name} 
-    <span class="status-badge {status_class}">{status_emoji} {status.upper()}</span>
-    """, unsafe_allow_html=True)
-    
-    if df.empty:
-        st.markdown(f'<div class="error-card">{get_text("no_data")}</div>', unsafe_allow_html=True)
-        return
-    
-    # Validate required columns
-    required_cols = ['Athlete Name', 'Current Position/Rank']
-    is_valid, issues = DataProcessor.validate_dataframe(df, required_cols)
-    
-    if not is_valid:
-        st.markdown(f'<div class="error-card">⚠️ Data validation failed: {"; ".join(issues)}</div>', unsafe_allow_html=True)
-        with st.expander("🔍 Raw Data"):
-            st.dataframe(df, use_container_width=True, hide_index=True)
-        return
-    
-    # Display enhanced metrics
-    display_enhanced_metrics(df, competition_name)
-    
-    st.markdown(f"#### {get_text('current_standings')}")
-    
-    # Find the total score column
-    score_col = next((col for col in df.columns if 'Total Score' in str(col)), None)
-    
-    # Sort and prepare data
-    df_sorted = df.copy()
-    
-    # Convert rank to numeric
-    if 'Current Position/Rank' in df.columns:
-        df_sorted['Current Position/Rank'] = pd.to_numeric(df_sorted['Current Position/Rank'], errors='coerce')
-    
-    # Convert score to numeric if available
-    if score_col is not None:
-        df_sorted[score_col] = pd.to_numeric(df_sorted[score_col], errors='coerce')
-    
-    # Sort by position
-    try:
-        if 'Current Position/Rank' in df_sorted.columns:
-            df_sorted = df_sorted.sort_values('Current Position/Rank', ascending=True).reset_index(drop=True)
-        elif score_col is not None:
-            df_sorted = df_sorted.sort_values(score_col, ascending=False).reset_index(drop=True)
-    except Exception as e:
-        logger.warning(f"Could not sort data: {e}")
-        df_sorted = df.copy()
-    
-    # Display results with enhanced athlete cards
-    display_boulder_athlete_cards(df_sorted, score_col, competition_name)
-
-
-def display_qualification_thresholds(qualification_info: Dict[str, str]):
-    """Display qualification thresholds if available - TRANSLATED"""
-    if qualification_info:
-        threshold_items = []
-        threshold_mapping = {
-            'Hold for 1st': ('🥇 1st', '#FFD700'),
-            'Hold for 2nd': ('🥈 2nd', '#C0C0C0'),
-            'Hold for 3rd': ('🥉 3rd', '#CD7F32'),
-            'Hold to Qualify': ('✅ Qualify', '#28a745'),
-            'Min to Qualify': ('⚠️ Min', '#ffc107')
-        }
-        
-        for key, value in qualification_info.items():
-            if key in threshold_mapping:
-                label, color = threshold_mapping[key]
-                threshold_items.append(f'<span style="color: {color}; font-weight: bold;">{label}: {value}</span>')
-        
-        if threshold_items:
-            st.markdown(f"""
-            <div class="threshold-card">
-                <h5>{get_text("qualification_thresholds")}</h5>
-                {' | '.join(threshold_items)}
-            </div>
-            """, unsafe_allow_html=True)
-
-
-def display_lead_results(df: pd.DataFrame, competition_name: str):
-    """Enhanced lead competition results display - TRANSLATED"""
-    status, status_emoji = CompetitionStatusDetector.get_competition_status(df, competition_name)
-    status_class = f"badge-{status}"
-    
-    st.markdown(f"""
-    ### 🧗‍♀️ {competition_name}
-    <span class="status-badge {status_class}">{status_emoji} {get_text(f"{status}_upper")}</span>
-    """, unsafe_allow_html=True)
-    
-    if df.empty:
-        st.markdown(f'<div class="error-card">{get_text("no_data")}</div>', unsafe_allow_html=True)
-        return
-    
-    if 'Name' not in df.columns:
-        st.markdown('<div class="error-card">⚠️ Name column not found in data</div>', unsafe_allow_html=True)
-        return
-    
-    # Extract qualification info and filter active athletes
-    qualification_info = extract_qualification_info(df)
-    active_df = filter_active_athletes(df, competition_name)
-    
-    # Display enhanced metrics
-    display_enhanced_metrics(active_df, competition_name)
-    
-    st.markdown(f"#### {get_text('current_standings')}")
-    
-    # Show qualification thresholds
-    display_qualification_thresholds(qualification_info)
-    
-    # Sort and display athletes
-    display_lead_athletes(active_df, qualification_info)
 
 
 def get_filtered_competitions(competition_type: str, gender_filter: str, round_filter: str) -> Dict[str, str]:
@@ -1624,7 +965,7 @@ def display_boulder_results(df: pd.DataFrame, competition_name: str):
     
     st.markdown(f"""
     ### 🪨 {competition_name} 
-    <span class="status-badge {status_class}">{status_emoji} {get_text(f"{status}_upper")}</span>
+    <span class="status-badge {status_class}">{status_emoji} {status.upper()}</span>
     """, unsafe_allow_html=True)
     
     if df.empty:
@@ -1723,11 +1064,10 @@ def calculate_boulder_completion(row: pd.Series) -> Dict[str, any]:
     # Check for worst finish information
     worst_finish_display = ""
     if completed_boulders == 4:
-        detail_text = f"{get_text('total')}: {total_score} | {boulder_display}{worst_finish_display}"
-    elif completed_boulders == 3:
-        detail_text = f"{get_text('total')}: {total_score} | {boulder_display} | 1 {get_text('boulder_remaining')}"
-    else:
-        detail_text = f"{get_text('total')}: {total_score} | {boulder_display} | {get_text('progress')}: {completed_boulders}/4"
+        worst_finish_col = next((
+            col for col in row.index 
+            if 'worst' in str(col).lower() and 'finish' in str(col).lower()
+        ), None)
         
         if worst_finish_col:
             worst_finish = row.get(worst_finish_col, 'N/A')
@@ -2001,13 +1341,13 @@ def display_lead_athletes(active_df: pd.DataFrame, qualification_info: Dict[str,
         
         position_emoji = get_lead_position_emoji(rank, has_score, card_class, status_emoji)
         
-        score_display = score if has_score else get_text('awaiting_result')
+        score_display = score if has_score else "Awaiting Result"
         worst_finish_display = format_worst_finish(worst_finish, has_score)
         
         st.markdown(f"""
         <div class="athlete-row {card_class}">
             <strong>{position_emoji} #{rank} - {name}</strong><br>
-            <small>{get_text('score')}: {score_display} | {get_text('status')}: {status}{worst_finish_display}</small>{threshold_display}
+            <small>Score: {score_display} | Status: {status}{worst_finish_display}</small>{threshold_display}
         </div>
         """, unsafe_allow_html=True)
 
@@ -2020,15 +1360,15 @@ def create_threshold_display(has_score: bool, qualification_info: Dict[str, str]
     thresholds = []
     for key, value in qualification_info.items():
         if key == 'Hold for 1st':
-            thresholds.append(f'🥇 For 1st Hold: {get_text("for_1st_hold")}: {value}')
+            thresholds.append(f'🥇 For 1st Hold: {value}')
         elif key == 'Hold for 2nd':
-            thresholds.append(f'🥈 For 2nd Hold: {get_text("for_2nd_hold")}: {value}')
+            thresholds.append(f'🥈 For 2nd Hold: {value}')
         elif key == 'Hold for 3rd':
-            thresholds.append(f'🥉 For 3rd Hold: {get_text("for_3rd_hold")}: {value}')
+            thresholds.append(f'🥉 For 3rd Hold: {value}')
         elif key == 'Hold to Qualify':
-            thresholds.append(f'🎯 For 8th Hold: {get_text("for_8th_hold")}: {value}')
+            thresholds.append(f'🎯 For 8th Hold: {value}')
         elif key == 'Min to Qualify':
-            thresholds.append(f'📊 For 8th Points: {get_text("for_8th_points")}: {value}')
+            thresholds.append(f'📊 For 8th Points: {value}')
     
     if thresholds:
         return f"<br><div class='targets'><strong>Targets:</strong><br>{' | '.join(thresholds)}</div>"
