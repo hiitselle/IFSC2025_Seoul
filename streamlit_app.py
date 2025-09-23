@@ -1065,6 +1065,8 @@ def main():
         st.session_state.selected_competitions = []
     if 'selected_language' not in st.session_state:
        st.session_state.selected_language = '🇺🇸 English'
+
+    language_selector()
     
     # Enhanced header
     st.markdown(f"""
