@@ -21,7 +21,311 @@ from scipy import stats
 from concurrent.futures import ThreadPoolExecutor
 import json
 
-# Configure logging
+
+# Multi-language support module - Add this to your existing streamlit_app.py
+
+# Language translations dictionary
+LANGUAGES = {
+    "🇺🇸 English": {
+        "app_title": "🧗‍♂️ IFSC 2025 World Championships",
+        "app_subtitle": "Live Competition Results Dashboard",
+        "app_description": "Real-time climbing competition tracking - Auto-refreshing every 2 seconds",
+        "dashboard_controls": "🎯 Dashboard Controls",
+        "refresh_settings": "🔄 Refresh Settings",
+        "auto_refresh_status": "Auto-refresh is ALWAYS ON - Every 2 seconds",
+        "manual_refresh": "🔄 Manual Refresh",
+        "clear_cache": "🗑️ Clear Cache",
+        "last_refresh": "🕒 Last refresh: {}s ago",
+        "next_refresh": "⚡ Next refresh in: {}s",
+        "competition_filters": "🎯 Competition Filters",
+        "discipline": "⛰️ Discipline",
+        "gender": "👤 Gender",
+        "round": "🎯 Round",
+        "competition_overview": "🚀 Competition Overview",
+        "total": "🏆 Total",
+        "live": "🔴 Live",
+        "completed": "✅ Completed",
+        "upcoming": "🔄 Upcoming",
+        "live_results": "📊 Live Results",
+        "current_standings": "📋 Current Standings",
+        "athletes": "👥 Athletes",
+        "problems_completed": "🧗‍♂️ Problems Completed",
+        "avg_score": "📊 Avg Score",
+        "leader": "🥇 Leader",
+        "qualification_thresholds": "🎯 Qualification Thresholds",
+        "no_data": "⚠️ No data available",
+        "no_competitions_found": "⚠️ No Competitions Found",
+        "adjust_filters": "No competitions match your current filters. Please adjust your selection.",
+        "loading": "Loading {}...",
+        "last_updated": "📡 Last updated: {}",
+        "refreshed": "✅ Refreshed!",
+        "cache_cleared": "✅ Cache cleared!",
+        "all": "All",
+        "boulder": "Boulder",
+        "lead": "Lead",
+        "male": "Male",
+        "female": "Female",
+        "semis": "Semis",
+        "final": "Final",
+    },
+    "🇫🇷 Français": {
+        "app_title": "🧗‍♂️ Championnats du Monde IFSC 2025",
+        "app_subtitle": "Tableau de Bord des Résultats en Direct",
+        "app_description": "Suivi en temps réel des compétitions d'escalade - Actualisation automatique toutes les 2 secondes",
+        "dashboard_controls": "🎯 Contrôles du Tableau de Bord",
+        "refresh_settings": "🔄 Paramètres d'Actualisation",
+        "auto_refresh_status": "L'actualisation automatique est TOUJOURS ACTIVÉE - Toutes les 2 secondes",
+        "manual_refresh": "🔄 Actualisation Manuelle",
+        "clear_cache": "🗑️ Vider le Cache",
+        "last_refresh": "🕒 Dernière actualisation : il y a {}s",
+        "next_refresh": "⚡ Prochaine actualisation dans : {}s",
+        "competition_filters": "🎯 Filtres de Compétition",
+        "discipline": "⛰️ Discipline",
+        "gender": "👤 Genre",
+        "round": "🎯 Manche",
+        "competition_overview": "🚀 Aperçu de la Compétition",
+        "total": "🏆 Total",
+        "live": "🔴 En Direct",
+        "completed": "✅ Terminé",
+        "upcoming": "🔄 À Venir",
+        "live_results": "📊 Résultats en Direct",
+        "current_standings": "📋 Classement Actuel",
+        "athletes": "👥 Athlètes",
+        "problems_completed": "🧗‍♂️ Problèmes Résolus",
+        "avg_score": "📊 Score Moyen",
+        "leader": "🥇 Leader",
+        "qualification_thresholds": "🎯 Seuils de Qualification",
+        "no_data": "⚠️ Aucune donnée disponible",
+        "no_competitions_found": "⚠️ Aucune Compétition Trouvée",
+        "adjust_filters": "Aucune compétition ne correspond à vos filtres actuels. Veuillez ajuster votre sélection.",
+        "loading": "Chargement de {}...",
+        "last_updated": "📡 Dernière mise à jour : {}",
+        "refreshed": "✅ Actualisé !",
+        "cache_cleared": "✅ Cache vidé !",
+        "all": "Tous",
+        "boulder": "Bloc",
+        "lead": "Difficulté",
+        "male": "Hommes",
+        "female": "Femmes",
+        "semis": "Demi-finales",
+        "final": "Finale",
+    },
+    "🇩🇪 Deutsch": {
+        "app_title": "🧗‍♂️ IFSC Weltmeisterschaft 2025",
+        "app_subtitle": "Live Wettkampfergebnis Dashboard",
+        "app_description": "Echtzeit-Kletternwettkampf-Verfolgung - Automatische Aktualisierung alle 2 Sekunden",
+        "dashboard_controls": "🎯 Dashboard-Steuerung",
+        "refresh_settings": "🔄 Aktualisierungseinstellungen",
+        "auto_refresh_status": "Automatische Aktualisierung ist IMMER EIN - Alle 2 Sekunden",
+        "manual_refresh": "🔄 Manuelle Aktualisierung",
+        "clear_cache": "🗑️ Cache Leeren",
+        "last_refresh": "🕒 Letzte Aktualisierung: vor {}s",
+        "next_refresh": "⚡ Nächste Aktualisierung in: {}s",
+        "competition_filters": "🎯 Wettkampffilter",
+        "discipline": "⛰️ Disziplin",
+        "gender": "👤 Geschlecht",
+        "round": "🎯 Runde",
+        "competition_overview": "🚀 Wettkampfübersicht",
+        "total": "🏆 Gesamt",
+        "live": "🔴 Live",
+        "completed": "✅ Abgeschlossen",
+        "upcoming": "🔄 Anstehend",
+        "live_results": "📊 Live-Ergebnisse",
+        "current_standings": "📋 Aktuelle Rangliste",
+        "athletes": "👥 Athleten",
+        "problems_completed": "🧗‍♂️ Gelöste Probleme",
+        "avg_score": "📊 Durchschnittswertung",
+        "leader": "🥇 Führender",
+        "qualification_thresholds": "🎯 Qualifikationsschwellen",
+        "no_data": "⚠️ Keine Daten verfügbar",
+        "no_competitions_found": "⚠️ Keine Wettkämpfe Gefunden",
+        "adjust_filters": "Keine Wettkämpfe entsprechen Ihren aktuellen Filtern. Bitte passen Sie Ihre Auswahl an.",
+        "loading": "Lade {}...",
+        "last_updated": "📡 Zuletzt aktualisiert: {}",
+        "refreshed": "✅ Aktualisiert!",
+        "cache_cleared": "✅ Cache geleert!",
+        "all": "Alle",
+        "boulder": "Bouldern",
+        "lead": "Vorstieg",
+        "male": "Männer",
+        "female": "Frauen",
+        "semis": "Halbfinale",
+        "final": "Finale",
+    },
+    "🇪🇸 Español": {
+        "app_title": "🧗‍♂️ Campeonatos Mundiales IFSC 2025",
+        "app_subtitle": "Panel de Resultados de Competición en Vivo",
+        "app_description": "Seguimiento de competiciones de escalada en tiempo real - Actualización automática cada 2 segundos",
+        "dashboard_controls": "🎯 Controles del Panel",
+        "refresh_settings": "🔄 Configuración de Actualización",
+        "auto_refresh_status": "La actualización automática está SIEMPRE ACTIVADA - Cada 2 segundos",
+        "manual_refresh": "🔄 Actualización Manual",
+        "clear_cache": "🗑️ Limpiar Caché",
+        "last_refresh": "🕒 Última actualización: hace {}s",
+        "next_refresh": "⚡ Próxima actualización en: {}s",
+        "competition_filters": "🎯 Filtros de Competición",
+        "discipline": "⛰️ Disciplina",
+        "gender": "👤 Género",
+        "round": "🎯 Ronda",
+        "competition_overview": "🚀 Resumen de la Competición",
+        "total": "🏆 Total",
+        "live": "🔴 En Vivo",
+        "completed": "✅ Completado",
+        "upcoming": "🔄 Próximo",
+        "live_results": "📊 Resultados en Vivo",
+        "current_standings": "📋 Clasificación Actual",
+        "athletes": "👥 Atletas",
+        "problems_completed": "🧗‍♂️ Problemas Completados",
+        "avg_score": "📊 Puntuación Media",
+        "leader": "🥇 Líder",
+        "qualification_thresholds": "🎯 Umbrales de Clasificación",
+        "no_data": "⚠️ No hay datos disponibles",
+        "no_competitions_found": "⚠️ No se Encontraron Competiciones",
+        "adjust_filters": "Ninguna competición coincide con sus filtros actuales. Por favor, ajuste su selección.",
+        "loading": "Cargando {}...",
+        "last_updated": "📡 Última actualización: {}",
+        "refreshed": "✅ ¡Actualizado!",
+        "cache_cleared": "✅ ¡Caché limpiado!",
+        "all": "Todos",
+        "boulder": "Boulder",
+        "lead": "Dificultad",
+        "male": "Hombres",
+        "female": "Mujeres",
+        "semis": "Semifinales",
+        "final": "Final",
+    },
+    "🇮🇹 Italiano": {
+        "app_title": "🧗‍♂️ Campionati Mondiali IFSC 2025",
+        "app_subtitle": "Dashboard dei Risultati di Gara in Diretta",
+        "app_description": "Monitoraggio delle gare di arrampicata in tempo reale - Aggiornamento automatico ogni 2 secondi",
+        "dashboard_controls": "🎯 Controlli Dashboard",
+        "refresh_settings": "🔄 Impostazioni Aggiornamento",
+        "auto_refresh_status": "L'aggiornamento automatico è SEMPRE ATTIVO - Ogni 2 secondi",
+        "manual_refresh": "🔄 Aggiornamento Manuale",
+        "clear_cache": "🗑️ Svuota Cache",
+        "last_refresh": "🕒 Ultimo aggiornamento: {}s fa",
+        "next_refresh": "⚡ Prossimo aggiornamento in: {}s",
+        "competition_filters": "🎯 Filtri Competizione",
+        "discipline": "⛰️ Disciplina",
+        "gender": "👤 Genere",
+        "round": "🎯 Round",
+        "competition_overview": "🚀 Panoramica Competizione",
+        "total": "🏆 Totale",
+        "live": "🔴 In Diretta",
+        "completed": "✅ Completato",
+        "upcoming": "🔄 Prossimo",
+        "live_results": "📊 Risultati in Diretta",
+        "current_standings": "📋 Classifica Attuale",
+        "athletes": "👥 Atleti",
+        "problems_completed": "🧗‍♂️ Problemi Completati",
+        "avg_score": "📊 Punteggio Medio",
+        "leader": "🥇 Leader",
+        "qualification_thresholds": "🎯 Soglie di Qualificazione",
+        "no_data": "⚠️ Nessun dato disponibile",
+        "no_competitions_found": "⚠️ Nessuna Gara Trovata",
+        "adjust_filters": "Nessuna gara corrisponde ai tuoi filtri attuali. Si prega di regolare la selezione.",
+        "loading": "Caricamento {}...",
+        "last_updated": "📡 Ultimo aggiornamento: {}",
+        "refreshed": "✅ Aggiornato!",
+        "cache_cleared": "✅ Cache svuotata!",
+        "all": "Tutti",
+        "boulder": "Boulder",
+        "lead": "Lead",
+        "male": "Uomini",
+        "female": "Donne",
+        "semis": "Semifinali",
+        "final": "Finale",
+    },
+    "🇯🇵 日本語": {
+        "app_title": "🧗‍♂️ IFSC 2025世界選手権",
+        "app_subtitle": "ライブ競技結果ダッシュボード",
+        "app_description": "リアルタイムクライミング競技追跡 - 2秒ごとの自動更新",
+        "dashboard_controls": "🎯 ダッシュボード制御",
+        "refresh_settings": "🔄 更新設定",
+        "auto_refresh_status": "自動更新は常にON - 2秒ごと",
+        "manual_refresh": "🔄 手動更新",
+        "clear_cache": "🗑️ キャッシュクリア",
+        "last_refresh": "🕒 最終更新: {}秒前",
+        "next_refresh": "⚡ 次の更新まで: {}秒",
+        "competition_filters": "🎯 競技フィルター",
+        "discipline": "⛰️ 種目",
+        "gender": "👤 性別",
+        "round": "🎯 ラウンド",
+        "competition_overview": "🚀 競技概要",
+        "total": "🏆 合計",
+        "live": "🔴 ライブ",
+        "completed": "✅ 完了",
+        "upcoming": "🔄 予定",
+        "live_results": "📊 ライブ結果",
+        "current_standings": "📋 現在の順位",
+        "athletes": "👥 選手",
+        "problems_completed": "🧗‍♂️ 完登課題数",
+        "avg_score": "📊 平均得点",
+        "leader": "🥇 首位",
+        "qualification_thresholds": "🎯 予選通過ライン",
+        "no_data": "⚠️ データがありません",
+        "no_competitions_found": "⚠️ 競技が見つかりません",
+        "adjust_filters": "現在のフィルターに一致する競技がありません。選択を調整してください。",
+        "loading": "{}を読み込み中...",
+        "last_updated": "📡 最終更新: {}",
+        "refreshed": "✅ 更新完了！",
+        "cache_cleared": "✅ キャッシュクリア完了！",
+        "all": "すべて",
+        "boulder": "ボルダリング",
+        "lead": "リード",
+        "male": "男子",
+        "female": "女子",
+        "semis": "準決勝",
+        "final": "決勝",
+    }
+}
+
+def get_text(key: str, language: str = None) -> str:
+    """Get localized text for the given key"""
+    if language is None:
+        language = st.session_state.get('selected_language', '🇺🇸 English')
+    
+    # Fallback to English if key not found in selected language
+    text = LANGUAGES.get(language, {}).get(key)
+    if text is None:
+        text = LANGUAGES['🇺🇸 English'].get(key, key)
+    
+    return text
+
+def language_selector():
+    """Display language selector at the top of the app"""
+    # Add language selector CSS
+    st.markdown("""
+    <style>
+        .language-selector {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 0.5rem 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            text-align: center;
+            border: 1px solid #dee2e6;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    with st.container():
+        st.markdown('<div class="language-selector">', unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            selected_language = st.selectbox(
+                "🌐 Language / Langue / Sprache / Idioma / Lingua / 言語",
+                list(LANGUAGES.keys()),
+                index=list(LANGUAGES.keys()).index(st.session_state.get('selected_language', '🇺🇸 English')),
+                key="language_selector"
+            )
+            
+            if selected_language != st.session_state.get('selected_language'):
+                st.session_state.selected_language = selected_language
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -749,6 +1053,8 @@ def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, st
         return "podium-contention", "📊"
 
 def main():
+    # Add this after session state initialization
+   language_selector()
     """Enhanced main application function with forced auto-refresh"""
     
     # Initialize session state
@@ -758,18 +1064,20 @@ def main():
         st.session_state.auto_refresh_enabled = True  # Always enabled
     if 'selected_competitions' not in st.session_state:
         st.session_state.selected_competitions = []
+    if 'selected_language' not in st.session_state:
+       st.session_state.selected_language = '🇺🇸 English'
     
     # Enhanced header
-    st.markdown("""
-    <div class="main-header">
-        <h1>🧗‍♂️ IFSC 2025 World Championships</h1>
-        <h3>Live Competition Results Dashboard</h3>
-        <p style="margin: 0; opacity: 0.9;">Real-time climbing competition tracking - Auto-refreshing every 2 seconds</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""
+   <div class="main-header">
+       <h1>{get_text("app_title")}</h1>
+       <h3>{get_text("app_subtitle")}</h3>
+       <p style="margin: 0; opacity: 0.9;">{get_text("app_description")}</p>
+   </div>
+   """, unsafe_allow_html=True)
     
     # Enhanced sidebar
-    st.sidebar.title("🎯 Dashboard Controls")
+    st.sidebar.title(get_text("dashboard_controls"))
     
     # Auto-refresh section - ALWAYS ENABLED
     with st.sidebar.expander("🔄 Refresh Settings", expanded=True):
