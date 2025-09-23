@@ -1054,7 +1054,6 @@ def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, st
 
 def main():
     # Add this after session state initialization
-   language_selector()
     """Enhanced main application function with forced auto-refresh"""
     
     # Initialize session state
