@@ -70,6 +70,37 @@ LANGUAGES = {
         "female": "Female",
         "semis": "Semis",
         "final": "Final",
+          "live_upper": "LIVE",
+        "completed_upper": "COMPLETED", 
+        "upcoming_upper": "UPCOMING",
+        "name": "Name",
+        "score": "Score", 
+        "status": "Status",
+        "awaiting_result": "Awaiting Result",
+        "progress": "Progress",
+        "boulder_remaining": "boulder remaining",
+        "targets": "Targets",
+        "strategy": "Strategy",
+        "for_1st_hold": "For 1st Hold",
+        "for_2nd_hold": "For 2nd Hold", 
+        "for_3rd_hold": "For 3rd Hold",
+        "for_8th_hold": "For 8th Hold",
+        "for_8th_points": "For 8th Points",
+        "worst_finish": "Worst Finish",
+        "unknown": "Unknown",
+        "no_boulder_data": "No boulder data",
+        "raw_data": "Raw Data",
+        "data_validation_failed": "Data validation failed",
+        "name_column_not_found": "Name column not found in data",
+        "application_error": "Application Error",
+        "refresh_page": "Please refresh the page or contact support if the issue persists.",
+        "debug_information": "Debug Information",
+        "help_discipline": "Filter by climbing discipline",
+        "help_gender": "Filter by gender category", 
+        "help_round": "Filter by competition round",
+        "ifsc_world_championships": "IFSC World Championships 2025",
+        "real_time_results": "Real-time Results",
+        "auto_refresh_always_on": "Auto-refresh: ALWAYS ON (2s)",
     },
     "🇫🇷 Français": {
         "app_title": "🧗‍♂️ Championnats du Monde IFSC 2025",
@@ -112,6 +143,38 @@ LANGUAGES = {
         "female": "Femmes",
         "semis": "Demi-finales",
         "final": "Finale",
+        "live_upper": "EN DIRECT",
+        "completed_upper": "TERMINÉ",
+        "upcoming_upper": "À VENIR",
+        "name": "Nom",
+        "score": "Score",
+        "status": "Statut", 
+        "awaiting_result": "En Attente du Résultat",
+        "progress": "Progrès",
+        "boulder_remaining": "bloc restant",
+        "targets": "Objectifs",
+        "strategy": "Stratégie",
+        "for_1st_hold": "Pour 1ère Place",
+        "for_2nd_hold": "Pour 2ème Place",
+        "for_3rd_hold": "Pour 3ème Place", 
+        "for_8th_hold": "Pour 8ème Place",
+        "for_8th_points": "Pour 8ème Points",
+        "worst_finish": "Pire Classement",
+        "unknown": "Inconnu",
+        "no_boulder_data": "Aucune donnée de bloc",
+        "raw_data": "Données Brutes",
+        "data_validation_failed": "Validation des données échouée",
+        "name_column_not_found": "Colonne nom non trouvée dans les données",
+        "application_error": "Erreur d'Application",
+        "refresh_page": "Veuillez actualiser la page ou contacter le support si le problème persiste.",
+        "debug_information": "Informations de Débogage",
+        "help_discipline": "Filtrer par discipline d'escalade",
+        "help_gender": "Filtrer par catégorie de genre",
+        "help_round": "Filtrer par manche de compétition", 
+        "ifsc_world_championships": "Championnats du Monde IFSC 2025",
+        "real_time_results": "Résultats en Temps Réel",
+        "auto_refresh_always_on": "Actualisation automatique : TOUJOURS ACTIVE (2s)",
+    },
     },
     "🇩🇪 Deutsch": {
         "app_title": "🧗‍♂️ IFSC Weltmeisterschaft 2025",
@@ -1468,7 +1531,7 @@ def display_lead_results(df: pd.DataFrame, competition_name: str):
     
     st.markdown(f"""
     ### 🧗‍♀️ {competition_name}
-    <span class="status-badge {status_class}">{status_emoji} {status.upper()}</span>
+    <span class="status-badge {status_class}">{status_emoji} {get_text(f"{status}_upper")}</span>
     """, unsafe_allow_html=True)
     
     if df.empty:
@@ -1561,7 +1624,7 @@ def display_boulder_results(df: pd.DataFrame, competition_name: str):
     
     st.markdown(f"""
     ### 🪨 {competition_name} 
-    <span class="status-badge {status_class}">{status_emoji} {status.upper()}</span>
+    <span class="status-badge {status_class}">{status_emoji} {get_text(f"{status}_upper")}</span>
     """, unsafe_allow_html=True)
     
     if df.empty:
@@ -1660,10 +1723,11 @@ def calculate_boulder_completion(row: pd.Series) -> Dict[str, any]:
     # Check for worst finish information
     worst_finish_display = ""
     if completed_boulders == 4:
-        worst_finish_col = next((
-            col for col in row.index 
-            if 'worst' in str(col).lower() and 'finish' in str(col).lower()
-        ), None)
+        detail_text = f"{get_text('total')}: {total_score} | {boulder_display}{worst_finish_display}"
+    elif completed_boulders == 3:
+        detail_text = f"{get_text('total')}: {total_score} | {boulder_display} | 1 {get_text('boulder_remaining')}"
+    else:
+        detail_text = f"{get_text('total')}: {total_score} | {boulder_display} | {get_text('progress')}: {completed_boulders}/4"
         
         if worst_finish_col:
             worst_finish = row.get(worst_finish_col, 'N/A')
@@ -1937,13 +2001,13 @@ def display_lead_athletes(active_df: pd.DataFrame, qualification_info: Dict[str,
         
         position_emoji = get_lead_position_emoji(rank, has_score, card_class, status_emoji)
         
-        score_display = score if has_score else "Awaiting Result"
+        score_display = score if has_score else get_text('awaiting_result')
         worst_finish_display = format_worst_finish(worst_finish, has_score)
         
         st.markdown(f"""
         <div class="athlete-row {card_class}">
             <strong>{position_emoji} #{rank} - {name}</strong><br>
-            <small>Score: {score_display} | Status: {status}{worst_finish_display}</small>{threshold_display}
+            <small>{get_text('score')}: {score_display} | {get_text('status')}: {status}{worst_finish_display}</small>{threshold_display}
         </div>
         """, unsafe_allow_html=True)
 
@@ -1956,15 +2020,15 @@ def create_threshold_display(has_score: bool, qualification_info: Dict[str, str]
     thresholds = []
     for key, value in qualification_info.items():
         if key == 'Hold for 1st':
-            thresholds.append(f'🥇 For 1st Hold: {value}')
+            thresholds.append(f'🥇 For 1st Hold: {get_text("for_1st_hold")}: {value}')
         elif key == 'Hold for 2nd':
-            thresholds.append(f'🥈 For 2nd Hold: {value}')
+            thresholds.append(f'🥈 For 2nd Hold: {get_text("for_2nd_hold")}: {value}')
         elif key == 'Hold for 3rd':
-            thresholds.append(f'🥉 For 3rd Hold: {value}')
+            thresholds.append(f'🥉 For 3rd Hold: {get_text("for_3rd_hold")}: {value}')
         elif key == 'Hold to Qualify':
-            thresholds.append(f'🎯 For 8th Hold: {value}')
+            thresholds.append(f'🎯 For 8th Hold: {get_text("for_8th_hold")}: {value}')
         elif key == 'Min to Qualify':
-            thresholds.append(f'📊 For 8th Points: {value}')
+            thresholds.append(f'📊 For 8th Points: {get_text("for_8th_points")}: {value}')
     
     if thresholds:
         return f"<br><div class='targets'><strong>Targets:</strong><br>{' | '.join(thresholds)}</div>"
