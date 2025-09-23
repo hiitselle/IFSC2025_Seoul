@@ -1099,7 +1099,6 @@ def determine_lead_athlete_status(status: str, has_score: bool) -> Tuple[str, st
         return "podium-contention", "📊"
 
 def main():
-    # Add this after session state initialization
     """Enhanced main application function with forced auto-refresh"""
     
     # Initialize session state
@@ -1114,7 +1113,7 @@ def main():
 
     language_selector()
     
-    # Enhanced header
+    # Enhanced header - ALREADY TRANSLATED ✅
     st.markdown(f"""
    <div class="main-header">
        <h1>{get_text("app_title")}</h1>
@@ -1123,66 +1122,71 @@ def main():
    </div>
    """, unsafe_allow_html=True)
     
-    # Enhanced sidebar
+    # Enhanced sidebar - FIX: Use get_text() here
     st.sidebar.title(get_text("dashboard_controls"))
     
-    # Auto-refresh section - ALWAYS ENABLED
-    with st.sidebar.expander("🔄 Refresh Settings", expanded=True):
-        st.markdown("**Auto-refresh is ALWAYS ON - Every 2 seconds**")
+    # Auto-refresh section - FIX: Use get_text() here
+    with st.sidebar.expander(get_text("refresh_settings"), expanded=True):
+        st.markdown(f"**{get_text('auto_refresh_status')}**")
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔄 Manual Refresh", type="primary", use_container_width=True):
+            if st.button(get_text("manual_refresh"), type="primary", use_container_width=True):
                 st.cache_data.clear()
                 st.session_state.last_refresh = datetime.now()
-                st.success("✅ Refreshed!")
+                st.success(get_text("refreshed"))
                 time.sleep(0.5)
                 st.rerun()
         
         with col2:
-            if st.button("🗑️ Clear Cache", use_container_width=True):
+            if st.button(get_text("clear_cache"), use_container_width=True):
                 st.cache_data.clear()
-                st.success("✅ Cache cleared!")
+                st.success(get_text("cache_cleared"))
         
-        # Show refresh status
+        # Show refresh status - FIX: Use get_text() here
         time_since = (datetime.now() - st.session_state.last_refresh).seconds
-        st.caption(f"🕒 Last refresh: {time_since}s ago")
-        st.caption("⚡ Next refresh in: " + str(2 - (time_since % 2)) + "s")
+        st.caption(get_text("last_refresh").format(time_since))
+        st.caption(get_text("next_refresh").format(2 - (time_since % 2)))
     
-    # Competition filters
-    with st.sidebar.expander("🎯 Competition Filters", expanded=True):
+    # Competition filters - FIX: Use get_text() here
+    with st.sidebar.expander(get_text("competition_filters"), expanded=True):
         competition_type = st.selectbox(
-            "⛰️ Discipline",
-            ["All", "Boulder", "Lead"],
+            get_text("discipline"),
+            [get_text("all"), get_text("boulder"), get_text("lead")],
             help="Filter by climbing discipline"
         )
         
         gender_filter = st.selectbox(
-            "👤 Gender",
-            ["All", "Male", "Female"],
+            get_text("gender"),
+            [get_text("all"), get_text("male"), get_text("female")],
             help="Filter by gender category"
         )
         
         round_filter = st.selectbox(
-            "🎯 Round",
-            ["All", "Semis", "Final"],
+            get_text("round"),
+            [get_text("all"), get_text("semis"), get_text("final")],
             help="Filter by competition round"
         )
     
-    # Filter competitions
-    filtered_competitions = get_filtered_competitions(competition_type, gender_filter, round_filter)
+    # Filter competitions - Need to map translated selections back to English
+    # Convert translated selections back to English for filtering
+    competition_type_en = map_to_english(competition_type, ["All", "Boulder", "Lead"])
+    gender_filter_en = map_to_english(gender_filter, ["All", "Male", "Female"])
+    round_filter_en = map_to_english(round_filter, ["All", "Semis", "Final"])
+    
+    filtered_competitions = get_filtered_competitions(competition_type_en, gender_filter_en, round_filter_en)
     
     if not filtered_competitions:
-        st.markdown("""
+        st.markdown(f"""
         <div class="error-card">
-            <h3>⚠️ No Competitions Found</h3>
-            <p>No competitions match your current filters. Please adjust your selection.</p>
+            <h3>{get_text("no_competitions_found")}</h3>
+            <p>{get_text("adjust_filters")}</p>
         </div>
         """, unsafe_allow_html=True)
         return
     
-    # Competition overview
-    st.markdown("### 🚀 Competition Overview")
+    # Competition overview - FIX: Use get_text() here
+    st.markdown(f"### {get_text('competition_overview')}")
     
     # Calculate overview metrics with progress
     overview_metrics = calculate_overview_metrics(filtered_competitions)
@@ -1191,7 +1195,7 @@ def main():
     with col1:
         st.markdown(f'''
         <div class="metric-card">
-            <h4>🏆 Total</h4>
+            <h4>{get_text("total")}</h4>
             <h2>{overview_metrics["total"]}</h2>
         </div>
         ''', unsafe_allow_html=True)
@@ -1199,7 +1203,7 @@ def main():
     with col2:
         st.markdown(f'''
         <div class="metric-card">
-            <h4>🔴 Live</h4>
+            <h4>{get_text("live")}</h4>
             <h2>{overview_metrics["live"]}</h2>
         </div>
         ''', unsafe_allow_html=True)
@@ -1207,7 +1211,7 @@ def main():
     with col3:
         st.markdown(f'''
         <div class="metric-card">
-            <h4>✅ Completed</h4>
+            <h4>{get_text("completed")}</h4>
             <h2>{overview_metrics["completed"]}</h2>
         </div>
         ''', unsafe_allow_html=True)
@@ -1215,13 +1219,13 @@ def main():
     with col4:
         st.markdown(f'''
         <div class="metric-card">
-            <h4>🔄 Upcoming</h4>
+            <h4>{get_text("upcoming")}</h4>
             <h2>{overview_metrics["upcoming"]}</h2>
         </div>
         ''', unsafe_allow_html=True)
     
-    # Display results
-    st.markdown("### 📊 Live Results")
+    # Display results - FIX: Use get_text() here
+    st.markdown(f"### {get_text('live_results')}")
     
     if len(filtered_competitions) > 1:
         # Create tabs for multiple competitions
@@ -1252,6 +1256,243 @@ def main():
         st.session_state.last_refresh = datetime.now()
         st.cache_data.clear()  # Clear cache on each refresh
         st.rerun()
+
+
+def map_to_english(translated_value: str, english_options: List[str]) -> str:
+    """Map translated filter values back to English for backend processing"""
+    current_lang = st.session_state.get('selected_language', '🇺🇸 English')
+    
+    # If already in English, return as-is
+    if current_lang == '🇺🇸 English':
+        return translated_value
+    
+    # Create reverse mapping
+    mapping = {
+        get_text("all"): "All",
+        get_text("boulder"): "Boulder", 
+        get_text("lead"): "Lead",
+        get_text("male"): "Male",
+        get_text("female"): "Female", 
+        get_text("semis"): "Semis",
+        get_text("final"): "Final"
+    }
+    
+    return mapping.get(translated_value, translated_value)
+
+
+def display_enhanced_metrics(df: pd.DataFrame, competition_name: str):
+    """Display enhanced metrics with progress indicators - TRANSLATED"""
+    col1, col2, col3, col4 = st.columns(4)
+    
+    if "Boulder" in competition_name:
+        metrics = MetricsCalculator.calculate_boulder_metrics(df)
+        
+        with col1:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>{get_text("athletes")}</h4>
+                <h2>{metrics["total_athletes"]}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>{get_text("problems_completed")}</h4>
+                <h2>{metrics["completed_problems"]}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>{get_text("avg_score")}</h4>
+                <h2>{metrics["avg_score"]:.1f}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col4:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>{get_text("leader")}</h4>
+                <h2>{metrics["leader"][:15]}{"..." if len(metrics["leader"]) > 15 else ""}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
+    
+    elif "Lead" in competition_name:
+        metrics = MetricsCalculator.calculate_lead_metrics(df)
+        
+        with col1:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>{get_text("athletes")}</h4>
+                <h2>{metrics["total_athletes"]}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col2:
+            completion_rate = (metrics["completed"] / max(metrics["total_athletes"], 1)) * 100
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>✅ {get_text("completed")}</h4>
+                <h2>{metrics["completed"]}</h2>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {completion_rate}%"></div>
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>{get_text("avg_score")}</h4>
+                <h2>{metrics["avg_score"]:.1f}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with col4:
+            st.markdown(f'''
+            <div class="metric-card">
+                <h4>{get_text("leader")}</h4>
+                <h2>{metrics["leader"][:15]}{"..." if len(metrics["leader"]) > 15 else ""}</h2>
+            </div>
+            ''', unsafe_allow_html=True)
+
+
+def display_competition_results(comp_name: str, url: str):
+    """Display results for a single competition - TRANSLATED"""
+    with st.spinner(get_text("loading").format(comp_name)):
+        df = DataLoader.load_sheet_data(url)
+    
+    current_time = datetime.now().strftime("%H:%M:%S")
+    st.caption(get_text("last_updated").format(current_time))
+    
+    if "Boulder" in comp_name:
+        display_boulder_results(df, comp_name)
+    elif "Lead" in comp_name:
+        display_lead_results(df, comp_name)
+    else:
+        if not df.empty:
+            st.dataframe(df, use_container_width=True, hide_index=True)
+        else:
+            st.markdown(f'<div class="error-card">{get_text("no_data")}</div>', unsafe_allow_html=True)
+
+
+def display_boulder_results(df: pd.DataFrame, competition_name: str):
+    """Enhanced boulder competition results display - TRANSLATED"""
+    status, status_emoji = CompetitionStatusDetector.get_competition_status(df, competition_name)
+    status_class = f"badge-{status}"
+    
+    st.markdown(f"""
+    ### 🪨 {competition_name} 
+    <span class="status-badge {status_class}">{status_emoji} {status.upper()}</span>
+    """, unsafe_allow_html=True)
+    
+    if df.empty:
+        st.markdown(f'<div class="error-card">{get_text("no_data")}</div>', unsafe_allow_html=True)
+        return
+    
+    # Validate required columns
+    required_cols = ['Athlete Name', 'Current Position/Rank']
+    is_valid, issues = DataProcessor.validate_dataframe(df, required_cols)
+    
+    if not is_valid:
+        st.markdown(f'<div class="error-card">⚠️ Data validation failed: {"; ".join(issues)}</div>', unsafe_allow_html=True)
+        with st.expander("🔍 Raw Data"):
+            st.dataframe(df, use_container_width=True, hide_index=True)
+        return
+    
+    # Display enhanced metrics
+    display_enhanced_metrics(df, competition_name)
+    
+    st.markdown(f"#### {get_text('current_standings')}")
+    
+    # Find the total score column
+    score_col = next((col for col in df.columns if 'Total Score' in str(col)), None)
+    
+    # Sort and prepare data
+    df_sorted = df.copy()
+    
+    # Convert rank to numeric
+    if 'Current Position/Rank' in df.columns:
+        df_sorted['Current Position/Rank'] = pd.to_numeric(df_sorted['Current Position/Rank'], errors='coerce')
+    
+    # Convert score to numeric if available
+    if score_col is not None:
+        df_sorted[score_col] = pd.to_numeric(df_sorted[score_col], errors='coerce')
+    
+    # Sort by position
+    try:
+        if 'Current Position/Rank' in df_sorted.columns:
+            df_sorted = df_sorted.sort_values('Current Position/Rank', ascending=True).reset_index(drop=True)
+        elif score_col is not None:
+            df_sorted = df_sorted.sort_values(score_col, ascending=False).reset_index(drop=True)
+    except Exception as e:
+        logger.warning(f"Could not sort data: {e}")
+        df_sorted = df.copy()
+    
+    # Display results with enhanced athlete cards
+    display_boulder_athlete_cards(df_sorted, score_col, competition_name)
+
+
+def display_qualification_thresholds(qualification_info: Dict[str, str]):
+    """Display qualification thresholds if available - TRANSLATED"""
+    if qualification_info:
+        threshold_items = []
+        threshold_mapping = {
+            'Hold for 1st': ('🥇 1st', '#FFD700'),
+            'Hold for 2nd': ('🥈 2nd', '#C0C0C0'),
+            'Hold for 3rd': ('🥉 3rd', '#CD7F32'),
+            'Hold to Qualify': ('✅ Qualify', '#28a745'),
+            'Min to Qualify': ('⚠️ Min', '#ffc107')
+        }
+        
+        for key, value in qualification_info.items():
+            if key in threshold_mapping:
+                label, color = threshold_mapping[key]
+                threshold_items.append(f'<span style="color: {color}; font-weight: bold;">{label}: {value}</span>')
+        
+        if threshold_items:
+            st.markdown(f"""
+            <div class="threshold-card">
+                <h5>{get_text("qualification_thresholds")}</h5>
+                {' | '.join(threshold_items)}
+            </div>
+            """, unsafe_allow_html=True)
+
+
+def display_lead_results(df: pd.DataFrame, competition_name: str):
+    """Enhanced lead competition results display - TRANSLATED"""
+    status, status_emoji = CompetitionStatusDetector.get_competition_status(df, competition_name)
+    status_class = f"badge-{status}"
+    
+    st.markdown(f"""
+    ### 🧗‍♀️ {competition_name}
+    <span class="status-badge {status_class}">{status_emoji} {status.upper()}</span>
+    """, unsafe_allow_html=True)
+    
+    if df.empty:
+        st.markdown(f'<div class="error-card">{get_text("no_data")}</div>', unsafe_allow_html=True)
+        return
+    
+    if 'Name' not in df.columns:
+        st.markdown('<div class="error-card">⚠️ Name column not found in data</div>', unsafe_allow_html=True)
+        return
+    
+    # Extract qualification info and filter active athletes
+    qualification_info = extract_qualification_info(df)
+    active_df = filter_active_athletes(df, competition_name)
+    
+    # Display enhanced metrics
+    display_enhanced_metrics(active_df, competition_name)
+    
+    st.markdown(f"#### {get_text('current_standings')}")
+    
+    # Show qualification thresholds
+    display_qualification_thresholds(qualification_info)
+    
+    # Sort and display athletes
+    display_lead_athletes(active_df, qualification_info)
 
 
 def get_filtered_competitions(competition_type: str, gender_filter: str, round_filter: str) -> Dict[str, str]:
