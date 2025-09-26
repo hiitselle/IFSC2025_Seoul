@@ -261,8 +261,8 @@ st.markdown("""
 
 # Configuration with updated auto-refresh settings
 class Config:
-    CACHE_TTL = 2  # Reduced cache time to 2 seconds
-    AUTO_REFRESH_INTERVAL = 2  # Refresh every 2 seconds
+    CACHE_TTL = 5  # Changed from 2 to 5 seconds
+    AUTO_REFRESH_INTERVAL = 5  # Changed from 2 to 5 seconds
     MAX_RETRIES = 3
     REQUEST_TIMEOUT = 15
     MAX_ATHLETES_DISPLAY = 50
@@ -764,7 +764,7 @@ def main():
     <div class="main-header">
         <h1>🧗‍♂️ IFSC 2025 World Championships</h1>
         <h3>Live Competition Results Dashboard</h3>
-        <p style="margin: 0; opacity: 0.9;">Real-time climbing competition tracking - Auto-refreshing every 2 seconds</p>
+        <p style="margin: 0; opacity: 0.9;">Real-time climbing competition tracking - Auto-refreshing every 5 seconds</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -773,7 +773,7 @@ def main():
     
     # Auto-refresh section - ALWAYS ENABLED
     with st.sidebar.expander("🔄 Refresh Settings", expanded=True):
-        st.markdown("**Auto-refresh is ALWAYS ON - Every 2 seconds**")
+        st.markdown("**Auto-refresh is ALWAYS ON - Every 5 seconds**")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -792,7 +792,7 @@ def main():
         # Show refresh status
         time_since = (datetime.now() - st.session_state.last_refresh).seconds
         st.caption(f"🕒 Last refresh: {time_since}s ago")
-        st.caption("⚡ Next refresh in: " + str(2 - (time_since % 2)) + "s")
+        st.caption("⚡ Next refresh in: " + str(5 - (time_since % 5)) + "s")
     
     # Competition filters
     with st.sidebar.expander("🎯 Competition Filters", expanded=True):
@@ -889,7 +889,7 @@ def main():
     with col2:
         st.markdown("**📊 Real-time Results**")
     with col3:
-        st.markdown("**🔄 Auto-refresh: ALWAYS ON (2s)**")
+        st.markdown("**🔄 Auto-refresh: ALWAYS ON (5s)**")
     
     # FORCED Auto-refresh logic - ALWAYS ACTIVE
     time_since_last = (datetime.now() - st.session_state.last_refresh).total_seconds()
