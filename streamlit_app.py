@@ -261,8 +261,8 @@ st.markdown("""
 
 # Configuration with updated auto-refresh settings
 class Config:
-    CACHE_TTL = 10  # Reduced cache time to 2 seconds
-    AUTO_REFRESH_INTERVAL = 10  # Refresh every 2 seconds
+    CACHE_TTL = 5  # Reduced cache time to 2 seconds
+    AUTO_REFRESH_INTERVAL = 5  # Refresh every 2 seconds
     MAX_RETRIES = 3
     REQUEST_TIMEOUT = 15
     MAX_ATHLETES_DISPLAY = 50
